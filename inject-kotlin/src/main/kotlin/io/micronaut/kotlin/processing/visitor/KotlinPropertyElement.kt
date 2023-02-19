@@ -35,6 +35,16 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     private val name: String
     private val classElement: ClassElement
     private val type: ClassElement
+    private val internalReturnType: ClassElement by lazy {
+        when (val t = getType()) {
+            is KotlinClassElement -> {
+                newClassElement(t.kotlinType, declaringType.typeArguments)
+            }
+            else -> {
+                t
+            }
+        }
+    }
     private val setter: Optional<MethodElement>
     private val getter: Optional<MethodElement>
     private val field: Optional<FieldElement>
@@ -439,7 +449,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     }
 
     override fun getGenericType(): ClassElement {
-        return resolveGeneric(declaration.parent, getType(), classElement, visitorContext)
+        return internalReturnType
     }
 
     override fun getAnnotationMetadata(): MutableAnnotationMetadataDelegate<*> {

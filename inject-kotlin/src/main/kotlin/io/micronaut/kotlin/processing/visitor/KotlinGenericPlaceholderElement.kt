@@ -18,28 +18,56 @@ package io.micronaut.kotlin.processing.visitor
 import com.google.devtools.ksp.closestClassDeclaration
 import com.google.devtools.ksp.symbol.KSTypeParameter
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.inject.ast.ArrayableClassElement
-import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.ast.Element
-import io.micronaut.inject.ast.GenericPlaceholderElement
+import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.annotation.Nullable
+import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.getBinaryName
 import java.util.*
 import java.util.function.Function
 
+//JavaNativeElement.Placeholder genericNativeType,
+//TypeVariable realTypeVariable,
+//@NonNull Element declaredElement,
+//@Nullable JavaClassElement resolved,
+//@NonNull List<JavaClassElement> bounds,
+//@NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
+//int arrayDimensions,
+//boolean isRawType
+
 class KotlinGenericPlaceholderElement(
-    private val parameter: KSTypeParameter,
+    private var parameter: KSTypeParameter,
+    upper: KotlinClassElement,
+    private var resolved: KotlinClassElement?,
+    private var bounds: List<KotlinClassElement>,
+    private var arrayDimensions: Int = 0,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-    visitorContext: KotlinVisitorContext,
-    private val arrayDimensions: Int = 0
-) : KotlinClassElement(parameter, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, true), ArrayableClassElement, GenericPlaceholderElement {
+    visitorContext: KotlinVisitorContext
+) : KotlinClassElement(upper.kotlinType,
+    elementAnnotationMetadataFactory,
+    visitorContext,
+    upper.resolvedTypeArguments,
+    arrayDimensions,
+    true), ArrayableClassElement, GenericPlaceholderElement {
+
+    constructor(parameter: KSTypeParameter,
+                resolved: KotlinClassElement?,
+                bounds: List<KotlinClassElement>,
+                arrayDimensions: Int = 0,
+                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+                visitorContext: KotlinVisitorContext
+        ) : this(parameter, selectClassElementRepresentingThisPlaceholder(resolved, bounds), resolved, bounds, arrayDimensions, elementAnnotationMetadataFactory, visitorContext) {
+            this.parameter = parameter;
+        }
+
     override fun copyThis(): KotlinGenericPlaceholderElement {
         return KotlinGenericPlaceholderElement(
             parameter,
+            resolved,
+            bounds,
+            arrayDimensions,
             annotationMetadataFactory,
-            visitorContext,
-            arrayDimensions
-        )
+            visitorContext)
     }
 
     override fun getName(): String {
@@ -59,20 +87,17 @@ class KotlinGenericPlaceholderElement(
     override fun getArrayDimensions(): Int = arrayDimensions
 
     override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
-        return KotlinGenericPlaceholderElement(parameter, annotationMetadataFactory, visitorContext, arrayDimensions)
+        return KotlinGenericPlaceholderElement(
+            parameter,
+            resolved,
+            bounds,
+            arrayDimensions,
+            annotationMetadataFactory,
+            visitorContext)
     }
 
-    override fun getBounds(): MutableList<out ClassElement> {
-        val elementFactory = visitorContext.elementFactory
-        val resolved = parameter.bounds.map {
-            val argumentType = it.resolve()
-            elementFactory.newClassElement(argumentType, annotationMetadataFactory)
-        }.toMutableList()
-        return if (resolved.isEmpty()) {
-            mutableListOf(visitorContext.getClassElement(Object::class.java.name).get())
-        } else {
-            resolved
-        }
+    override fun getBounds(): List<out ClassElement> {
+        return bounds;
     }
 
     override fun getVariableName(): String {
@@ -88,26 +113,35 @@ class KotlinGenericPlaceholderElement(
         }
     }
 
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        if (!super.equals(other)) return false
+//    override fun equals(other: Any?): Boolean {
+//        if (this === other) return true
+//        if (javaClass != other?.javaClass) return false
+//        if (!super.equals(other)) return false
+//
+//        other as KotlinGenericPlaceholderElement
+//
+//        if (parameter.simpleName.asString() != other.parameter.simpleName.asString()) return false
+//
+//        return true
+//    }
 
-        other as KotlinGenericPlaceholderElement
-
-        if (parameter.simpleName.asString() != other.parameter.simpleName.asString()) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = super.hashCode()
-        result = 31 * result + parameter.simpleName.asString().hashCode()
-        return result
-    }
+//    override fun hashCode(): Int {
+//        var result = super.hashCode()
+//        result = 31 * result + parameter.simpleName.asString().hashCode()
+//        return result
+//    }
 
     override fun foldBoundGenericTypes(fold: Function<ClassElement, ClassElement>?): ClassElement {
         Objects.requireNonNull(fold, "Function argument cannot be null")
         return fold!!.apply(this)
+    }
+
+    companion object {
+        private fun selectClassElementRepresentingThisPlaceholder(
+            @Nullable resolved: KotlinClassElement?,
+            @NonNull bounds: List<KotlinClassElement>
+        ): KotlinClassElement {
+            return resolved ?: WildcardElement.findUpperType(bounds, bounds)
+        }
     }
 }

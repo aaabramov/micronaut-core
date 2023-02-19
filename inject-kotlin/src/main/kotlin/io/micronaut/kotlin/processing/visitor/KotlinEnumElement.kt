@@ -17,13 +17,18 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import java.util.*
 
-class KotlinEnumElement(private val type: KSType, elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory, visitorContext: KotlinVisitorContext):
-    KotlinClassElement(type, elementAnnotationMetadataFactory, visitorContext), EnumElement {
+class KotlinEnumElement(private val type: KSType,
+                        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+                        visitorContext: KotlinVisitorContext,
+                        resolvedTypeArguments : Map<String, ClassElement>?):
+
+    KotlinClassElement(type, elementAnnotationMetadataFactory, visitorContext, resolvedTypeArguments), EnumElement {
 
     override fun values(): List<String> {
         return classDeclaration.declarations
@@ -40,7 +45,8 @@ class KotlinEnumElement(private val type: KSType, elementAnnotationMetadataFacto
         return KotlinEnumElement(
             type,
             annotationMetadataFactory,
-            visitorContext
+            visitorContext,
+            resolvedTypeArguments
         )
     }
 

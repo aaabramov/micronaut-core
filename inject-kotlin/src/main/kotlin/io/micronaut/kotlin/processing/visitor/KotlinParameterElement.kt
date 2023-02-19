@@ -32,13 +32,15 @@ class KotlinParameterElement(
     private val internalName : String by lazy {
         parameter.name!!.asString()
     }
-    private val internalGenericType : ClassElement by lazy {
-        resolveGeneric(
-            methodElement.declaration.parent,
-            parameterType,
-            methodElement.owningType,
-            visitorContext
-        )
+    private val internalReturnType: ClassElement by lazy {
+        when (val t = type) {
+            is KotlinClassElement -> {
+                newClassElement(t.kotlinType, methodElement.declaringType.typeArguments)
+            }
+            else -> {
+                t
+            }
+        }
     }
 
     override fun isPrimitive(): Boolean {
@@ -74,7 +76,7 @@ class KotlinParameterElement(
     override fun getType(): ClassElement = parameterType
 
     override fun getGenericType(): ClassElement {
-        return internalGenericType
+        return internalReturnType
     }
 
     override fun getArrayDimensions(): Int = parameterType.arrayDimensions

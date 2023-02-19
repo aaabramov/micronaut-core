@@ -32,6 +32,7 @@ class KotlinWildcardElement(
     upperBounds[0]!!.nativeType,
     elementAnnotationMetadataFactory,
     visitorContext,
+    emptyMap(),
     arrayDimensions,
     false
 ), WildcardElement {

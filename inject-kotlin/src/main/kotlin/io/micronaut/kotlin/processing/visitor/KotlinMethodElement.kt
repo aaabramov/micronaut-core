@@ -19,7 +19,6 @@ import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.util.ArrayUtils
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.getVisibility
@@ -41,15 +40,23 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         }
         val owner = getOwningType()
         if (parent is KSClassDeclaration) {
-            if (owner.name.equals(parent.qualifiedName)) {
+            val className = parent.qualifiedName.toString()
+            if (owner.name.equals(className)) {
                 owner
             } else {
-                visitorContext.elementFactory.newClassElement(
-                    parent.asStarProjectedType()
-                )
+                var parentTypeArguments = owner.getTypeArguments(className)
+                newClassElement(parent.asStarProjectedType(), parentTypeArguments)
             }
         } else {
             owner
+        }
+    }
+    private val internalDeclaredTypeArguments: Map<String, ClassElement> by lazy {
+        val nativeType = kspNode()
+        if (nativeType is KSDeclaration) {
+            resolveTypeArguments(nativeType, emptyMap())
+        } else {
+            emptyMap()
         }
     }
 
@@ -58,6 +65,16 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         parameterInit.get()
     }
     private val returnType: ClassElement
+    private val internalGenericReturnType: ClassElement by lazy {
+        when (val rt = getReturnType()) {
+            is KotlinClassElement -> {
+                newClassElement(rt.kotlinType, declaringType.typeArguments)
+            }
+            else -> {
+                rt
+            }
+        }
+    }
     private val abstract: Boolean
     private val public: Boolean
     private val private: Boolean
@@ -168,9 +185,6 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         this.internal = internal
     }
 
-    override fun getOwningType(): ClassElement {
-        return owningType
-    }
 
     override fun isSynthetic(): Boolean {
         return if (declaration is KSPropertyGetter || declaration is KSPropertySetter) {
@@ -196,15 +210,12 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         return super<AbstractKotlinElement>.getModifiers()
     }
 
+    override fun getDeclaredTypeArguments(): Map<String, ClassElement> {
+        return internalDeclaredTypeArguments
+    }
+
     override fun getDeclaredTypeVariables(): MutableList<out GenericPlaceholderElement> {
-        val nativeType = kspNode()
-        return if (nativeType is KSDeclaration) {
-            nativeType.typeParameters.map {
-                KotlinGenericPlaceholderElement(it, annotationMetadataFactory, visitorContext)
-            }.toMutableList()
-        } else {
-            super.getDeclaredTypeVariables()
-        }
+        return declaredTypeArguments.values.map { it as GenericPlaceholderElement }.toMutableList()
     }
 
     override fun isSuspend(): Boolean {
@@ -221,7 +232,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         return if (isSuspend) {
             val continuationParameter = visitorContext.getClassElement("kotlin.coroutines.Continuation")
                 .map {
-                    var rt = genericReturnType
+                    var rt = internalGenericReturnType
                     if (rt.isPrimitive && rt.name.equals("void")) {
                         rt = ClassElement.of(Unit::class.java)
                     }
@@ -283,6 +294,10 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         return name
     }
 
+    override fun getOwningType(): ClassElement {
+        return owningType
+    }
+
     override fun getDeclaringType(): ClassElement {
         return internalDeclaringType
     }
@@ -292,11 +307,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     }
 
     override fun getGenericReturnType(): ClassElement {
-        return if (this is ConstructorElement) {
-            returnType
-        } else {
-            resolveGeneric(declaration.parent, returnType, owningType, visitorContext)
-        }
+        return internalGenericReturnType
     }
 
     override fun getParameters(): Array<ParameterElement> {

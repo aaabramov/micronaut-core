@@ -57,85 +57,69 @@ class KotlinElementFactory(
         type: KSType,
         annotationMetadataFactory: ElementAnnotationMetadataFactory
     ): ClassElement {
-        return newClassElement(
-            type,
-            annotationMetadataFactory,
-            true
-        )
+        return KotlinClassElement(type, annotationMetadataFactory, visitorContext, null, 0, false)
     }
 
-    override fun newClassElement(
-        type: KSType,
-        annotationMetadataFactory: ElementAnnotationMetadataFactory,
-        resolvedGenerics: Map<String, ClassElement>
-    ): ClassElement {
-        return newClassElement(
-            type,
-            annotationMetadataFactory,
-            true
-        )
-    }
+//    fun newClassElement(annotated: KSAnnotated,
+//                        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+//                        allowPrimitive: Boolean): ClassElement {
+//        val type = KotlinClassElement.getType(annotated, visitorContext)
+//        val declaration = type.declaration
+//        val qualifiedName = declaration.qualifiedName!!.asString()
+//        val hasNoAnnotations = !annotated.annotations.iterator().hasNext()
+//        var element = primitiveArrays[qualifiedName]
+//        if (hasNoAnnotations && element != null) {
+//            return element
+//        }
+//        if (qualifiedName == "kotlin.Array") {
+//            val component = type.arguments[0].type!!.resolve()
+//            val componentElement = newClassElement(component, elementAnnotationMetadataFactory, false)
+//            return componentElement.toArray()
+//        } else if (declaration is KSTypeParameter) {
+//            return KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
+//        }
+//        if (allowPrimitive && !type.isMarkedNullable) {
+//            element = primitives[qualifiedName]
+//            if (hasNoAnnotations && element != null ) {
+//                return element
+//            }
+//        }
+//        return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
+//            KotlinEnumElement(type, elementAnnotationMetadataFactory, visitorContext)
+//        } else {
+//            KotlinClassElement(annotated, elementAnnotationMetadataFactory, visitorContext)
+//        }
+//    }
 
-    fun newClassElement(annotated: KSAnnotated,
-                        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                        allowPrimitive: Boolean): ClassElement {
-        val type = KotlinClassElement.getType(annotated, visitorContext)
-        val declaration = type.declaration
-        val qualifiedName = declaration.qualifiedName!!.asString()
-        val hasNoAnnotations = !annotated.annotations.iterator().hasNext()
-        var element = primitiveArrays[qualifiedName]
-        if (hasNoAnnotations && element != null) {
-            return element
-        }
-        if (qualifiedName == "kotlin.Array") {
-            val component = type.arguments[0].type!!.resolve()
-            val componentElement = newClassElement(component, elementAnnotationMetadataFactory, false)
-            return componentElement.toArray()
-        } else if (declaration is KSTypeParameter) {
-            return KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
-        }
-        if (allowPrimitive && !type.isMarkedNullable) {
-            element = primitives[qualifiedName]
-            if (hasNoAnnotations && element != null ) {
-                return element
-            }
-        }
-        return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
-            KotlinEnumElement(type, elementAnnotationMetadataFactory, visitorContext)
-        } else {
-            KotlinClassElement(annotated, elementAnnotationMetadataFactory, visitorContext)
-        }
-    }
-
-    fun newClassElement(type: KSType,
-                        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                        allowPrimitive: Boolean): ClassElement {
-        val declaration = type.declaration
-        val qualifiedName = declaration.qualifiedName!!.asString()
-        val hasNoAnnotations = !type.annotations.iterator().hasNext()
-        var element = primitiveArrays[qualifiedName]
-        if (hasNoAnnotations && element != null) {
-            return element
-        }
-        if (qualifiedName == "kotlin.Array") {
-            val component = type.arguments[0].type!!.resolve()
-            val componentElement = newClassElement(component, elementAnnotationMetadataFactory, false)
-            return componentElement.toArray()
-        } else if (declaration is KSTypeParameter) {
-            return KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
-        }
-        if (allowPrimitive && !type.isMarkedNullable) {
-            element = primitives[qualifiedName]
-            if (hasNoAnnotations && element != null ) {
-                return element
-            }
-        }
-        return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
-            KotlinEnumElement(type, elementAnnotationMetadataFactory, visitorContext)
-        } else {
-            KotlinClassElement(type, elementAnnotationMetadataFactory, visitorContext)
-        }
-    }
+//    fun newClassElement(type: KSType,
+//                        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+//                        allowPrimitive: Boolean): ClassElement {
+//        val declaration = type.declaration
+//        val qualifiedName = declaration.qualifiedName!!.asString()
+//        val hasNoAnnotations = !type.annotations.iterator().hasNext()
+//        var element = primitiveArrays[qualifiedName]
+//        if (hasNoAnnotations && element != null) {
+//            return element
+//        }
+//        if (qualifiedName == "kotlin.Array") {
+//            val component = type.arguments[0].type!!.resolve()
+//            val componentElement = newClassElement(component, elementAnnotationMetadataFactory, false)
+//            return componentElement.toArray()
+//        } else if (declaration is KSTypeParameter) {
+//            return KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
+//        }
+//        if (allowPrimitive && !type.isMarkedNullable) {
+//            element = primitives[qualifiedName]
+//            if (hasNoAnnotations && element != null ) {
+//                return element
+//            }
+//        }
+//        return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
+//            KotlinEnumElement(type, elementAnnotationMetadataFactory, visitorContext)
+//        } else {
+//            KotlinClassElement(type, elementAnnotationMetadataFactory, visitorContext)
+//        }
+//    }
 
     override fun newSourceClassElement(
         type: KSType,

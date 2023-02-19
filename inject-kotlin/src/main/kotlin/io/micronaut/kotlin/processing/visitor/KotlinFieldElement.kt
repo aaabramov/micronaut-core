@@ -30,11 +30,17 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
 
     private val internalName = declaration.simpleName.asString()
     private val internalType : ClassElement by lazy {
-        visitorContext.elementFactory.newClassElement(declaration.type.resolve())
+        newClassElement(declaration.type.resolve(), emptyMap())
     }
-
-    private val internalGenericType : ClassElement by lazy {
-        resolveGeneric(declaration.parent, type, declaringType, visitorContext)
+    private val internalReturnType: ClassElement by lazy {
+        when (val t = type) {
+            is KotlinClassElement -> {
+                newClassElement(t.kotlinType, declaringType.typeArguments)
+            }
+            else -> {
+                t
+            }
+        }
     }
 
     override fun isFinal(): Boolean {
@@ -66,7 +72,7 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
     }
 
     override fun getGenericType(): ClassElement {
-        return internalGenericType
+        return internalReturnType
     }
 
     override fun isPrimitive(): Boolean {

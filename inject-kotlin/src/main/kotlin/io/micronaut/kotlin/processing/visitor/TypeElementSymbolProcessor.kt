@@ -35,6 +35,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessor
 import java.util.*
+import kotlin.collections.HashSet
 
 open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
 
@@ -78,7 +79,6 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
 
         if (loadedVisitors.isNotEmpty()) {
 
-
             val elements = resolver.getAllFiles()
                 .flatMap { file: KSFile -> file.declarations }
                 .filterIsInstance<KSClassDeclaration>()
@@ -90,6 +90,7 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                 .toList()
 
             if (elements.isNotEmpty()) {
+                val classElementsCache: MutableMap<KSClassDeclaration, ClassElement> = HashMap()
 
                 // The visitor X with a higher priority should process elements of A before
                 // the visitor Y which is processing elements of B but also using elements A
@@ -104,7 +105,7 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                         if (typeElement.classKind != ClassKind.ANNOTATION_CLASS) {
                             val className = typeElement.qualifiedName.toString()
                             try {
-                                typeElement.accept(ElementVisitor(loadedVisitor, typeElement), className)
+                                typeElement.accept(ElementVisitor(loadedVisitor, typeElement, classElementsCache), className)
                             } catch (e: ProcessingException) {
                                 BeanDefinitionProcessor.handleProcessingException(environment, e)
                             }
@@ -195,8 +196,11 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
         return typeElementVisitors.values
     }
 
-    private inner class ElementVisitor(private val loadedVisitor: LoadedVisitor,
-    private val classDeclaration: KSClassDeclaration) : KSTopDownVisitor<Any, Any>() {
+    private inner class ElementVisitor(
+        private val loadedVisitor: LoadedVisitor,
+        private val classDeclaration: KSClassDeclaration,
+        private val classElementsCache: MutableMap<KSClassDeclaration, ClassElement>
+    ) : KSTopDownVisitor<Any, Any>() {
 
         override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Any): Any {
             if (classDeclaration.qualifiedName!!.asString() == "kotlin.Any") {
@@ -208,7 +212,12 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
             if (classDeclaration == this.classDeclaration) {
                 val visitorContext = loadedVisitor.visitorContext
                 if (loadedVisitor.matches(classDeclaration)) {
-                    val classElement = newClassElement(visitorContext, classDeclaration)
+                    val classElement = classElementsCache.computeIfAbsent(classDeclaration) { cd ->
+                        newClassElement(
+                            visitorContext,
+                            cd
+                        )
+                    }
 
                     try {
                         loadedVisitor.visitor.visitClass(classElement, visitorContext)
