@@ -30,27 +30,20 @@ class KotlinEnumElement(private val type: KSType,
 
     KotlinClassElement(type, elementAnnotationMetadataFactory, visitorContext, resolvedTypeArguments), EnumElement {
 
-    override fun values(): List<String> {
-        return classDeclaration.declarations
-            .filterIsInstance<KSClassDeclaration>()
-            .map { decl -> decl.simpleName.asString() }
-            .toList()
-    }
+    override fun values() = classDeclaration.declarations
+        .filterIsInstance<KSClassDeclaration>()
+        .map { decl -> decl.simpleName.asString() }
+        .toList()
 
-    override fun getDefaultConstructor(): Optional<MethodElement> {
-        return Optional.empty()
-    }
+    override fun getDefaultConstructor(): Optional<MethodElement> = Optional.empty()
 
-    override fun copyThis(): KotlinEnumElement {
-        return KotlinEnumElement(
-            type,
-            annotationMetadataFactory,
-            visitorContext,
-            resolvedTypeArguments
-        )
-    }
+    override fun getPrimaryConstructor(): Optional<MethodElement> = Optional.of(KotlinEnumConstructorElement(this))
 
-    override fun getPrimaryConstructor(): Optional<MethodElement> {
-        return Optional.of(KotlinEnumConstructorElement(this))
-    }
+    override fun copyThis() = KotlinEnumElement(
+        type,
+        annotationMetadataFactory,
+        visitorContext,
+        resolvedTypeArguments
+    )
+
 }

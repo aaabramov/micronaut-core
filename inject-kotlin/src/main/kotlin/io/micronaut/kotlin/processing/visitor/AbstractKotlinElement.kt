@@ -38,27 +38,21 @@ abstract class AbstractKotlinElement<T : KSNode>(
     protected val visitorContext: KotlinVisitorContext
 ) : Element, ElementMutableAnnotationMetadataDelegate<Element> {
 
-    protected var presetAnnotationMetadata: AnnotationMetadata? = null
+    private var presetAnnotationMetadata: AnnotationMetadata? = null
     private var elementAnnotationMetadata: ElementAnnotationMetadata? = null
 
-    override fun getNativeType(): T {
-        return declaration
+    override fun getNativeType(): T = declaration
+
+    override fun isProtected() = if (declaration is KSDeclaration) {
+        declaration.getVisibility() == Visibility.PROTECTED
+    } else {
+        false
     }
 
-    override fun isProtected(): Boolean {
-        return if (declaration is KSDeclaration) {
-            declaration.getVisibility() == Visibility.PROTECTED
-        } else {
-            false
-        }
-    }
-
-    override fun isStatic(): Boolean {
-        return if (declaration is KSDeclaration) {
-            declaration.modifiers.contains(Modifier.JAVA_STATIC)
-        } else {
-            false
-        }
+    override fun isStatic() = if (declaration is KSDeclaration) {
+        declaration.modifiers.contains(Modifier.JAVA_STATIC)
+    } else {
+        false
     }
 
     protected fun makeCopy(): AbstractKotlinElement<T> {
@@ -87,39 +81,38 @@ abstract class AbstractKotlinElement<T : KSNode>(
 
     override fun getAnnotationMetadata(): MutableAnnotationMetadataDelegate<*> {
         if (elementAnnotationMetadata == null) {
-
             val factory = annotationMetadataFactory
-            if (presetAnnotationMetadata == null) {
-                elementAnnotationMetadata = factory.build(this)
+            elementAnnotationMetadata = if (presetAnnotationMetadata == null) {
+                factory.build(this)
             } else {
-                elementAnnotationMetadata = factory.build(this, presetAnnotationMetadata)
+                factory.build(this, presetAnnotationMetadata)
             }
         }
         return elementAnnotationMetadata!!
     }
 
-    override fun isPublic(): Boolean {
-        return if (declaration is KSDeclaration) {
-            declaration.getVisibility() == Visibility.PUBLIC
-        } else {
-            false
-        }
+    override fun isPublic() = if (declaration is KSDeclaration) {
+        declaration.getVisibility() == Visibility.PUBLIC
+    } else {
+        false
     }
 
-    override fun isPrivate(): Boolean {
-        return if (declaration is KSDeclaration) {
-            declaration.getVisibility() == Visibility.PRIVATE
-        } else {
-            false
-        }
+    override fun isPrivate() = if (declaration is KSDeclaration) {
+        declaration.getVisibility() == Visibility.PRIVATE
+    } else {
+        false
     }
 
-    override fun isFinal(): Boolean {
-        return if (declaration is KSDeclaration) {
-            !declaration.isOpen() || declaration.modifiers.contains(Modifier.FINAL)
-        } else {
-            false
-        }
+    override fun isPackagePrivate() = if (declaration is KSDeclaration) {
+        declaration.isJavaPackagePrivate()
+    } else {
+        false
+    }
+
+    override fun isFinal() = if (declaration is KSDeclaration) {
+        !declaration.isOpen() || declaration.modifiers.contains(Modifier.FINAL)
+    } else {
+        false
     }
 
     override fun isAbstract(): Boolean {
@@ -202,14 +195,6 @@ abstract class AbstractKotlinElement<T : KSNode>(
         return super<ElementMutableAnnotationMetadataDelegate>.removeStereotype(annotationType)
     }
 
-    override fun isPackagePrivate(): Boolean {
-        return if (declaration is KSDeclaration) {
-            declaration.isJavaPackagePrivate()
-        } else {
-            false
-        }
-    }
-
     override fun getDocumentation(): Optional<String> {
         return if (declaration is KSDeclaration) {
             Optional.ofNullable(declaration.docString)
@@ -252,14 +237,8 @@ abstract class AbstractKotlinElement<T : KSNode>(
         visitedTypes: MutableSet<Any>
     ): ClassElement {
         val variableName = typeParameter.name.asString()
-        val bounded = parentTypeArguments[variableName]
-
-        if (bounded != null) {
-            return bounded
-        }
-
+        val bounded = parentTypeArguments[variableName] as KotlinClassElement?
         val stripTypeArguments = !visitedTypes.add(typeParameter)
-
         val bounds = typeParameter.bounds.map {
             val argumentType = it.resolve()
             newKotlinClassElement(argumentType, parentTypeArguments, visitedTypes, stripTypeArguments)
@@ -269,7 +248,7 @@ abstract class AbstractKotlinElement<T : KSNode>(
 
         return KotlinGenericPlaceholderElement(
             typeParameter,
-            null,
+            bounded,
             bounds,
             0,
             annotationMetadataFactory,
@@ -335,13 +314,13 @@ abstract class AbstractKotlinElement<T : KSNode>(
     }
 
     private fun resolveLowerBounds(
-        arg: KSTypeArgument,
+        typeArgument: KSTypeArgument,
         parentTypeArguments: Map<String, ClassElement>,
         visitedTypes: MutableSet<Any>
     ): List<KotlinClassElement?> {
-        return if (arg.variance == Variance.CONTRAVARIANT) {
+        return if (typeArgument.variance == Variance.CONTRAVARIANT) {
             listOf(
-                newKotlinClassElement(arg.type?.resolve()!!, parentTypeArguments, visitedTypes)
+                newKotlinClassElement(typeArgument.type?.resolve()!!, parentTypeArguments, visitedTypes)
             )
         } else {
             return emptyList()

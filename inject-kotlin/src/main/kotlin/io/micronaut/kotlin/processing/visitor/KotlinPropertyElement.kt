@@ -25,6 +25,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
+import io.micronaut.kotlin.processing.getBinaryName
 import io.micronaut.kotlin.processing.kspNode
 import java.util.*
 import java.util.function.Consumer
@@ -35,7 +36,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     private val name: String
     private val classElement: ClassElement
     private val type: ClassElement
-    private val internalReturnType: ClassElement by lazy {
+    private val internalGenericType: ClassElement by lazy {
         when (val t = getType()) {
             is KotlinClassElement -> {
                 newClassElement(t.kotlinType, declaringType.typeArguments)
@@ -49,24 +50,23 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     private val getter: Optional<MethodElement>
     private val field: Optional<FieldElement>
     private val abstract: Boolean
-    private val exc: Boolean
+    private val excluded: Boolean
     private var annotationMetadata: MutableAnnotationMetadataDelegate<*>? = null
     private val internalDeclaringType: ClassElement by lazy {
         var parent = declaration.parent
         if (parent is KSPropertyDeclaration) {
             parent = parent.parent
         }
-        val owner = getOwningType()
         if (parent is KSClassDeclaration) {
-            if (owner.name.equals(parent.qualifiedName)) {
-                owner
+            val className = parent.getBinaryName(visitorContext.resolver, visitorContext)
+            if (owningType.name.equals(className)) {
+                owningType
             } else {
-                visitorContext.elementFactory.newClassElement(
-                    parent.asStarProjectedType()
-                )
+                val parentTypeArguments = owningType.getTypeArguments(className)
+                newClassElement(parent.asStarProjectedType(), parentTypeArguments)
             }
         } else {
-            owner
+            owningType
         }
     }
 
@@ -77,7 +77,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 visitorContext: KotlinVisitorContext,
                 excluded : Boolean = false) : super(KSPropertyReference(property), elementAnnotationMetadataFactory, visitorContext) {
         this.name = property.simpleName.asString()
-        this.exc = excluded
+        this.excluded = excluded
         this.type = type
         this.classElement = classElement
         this.setter = Optional.ofNullable(property.setter)
@@ -115,7 +115,6 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         getter.ifPresent { elements.add(it) }
         field.ifPresent { elements.add(it) }
 
-
         // The instance AnnotationMetadata of each element can change after a modification
         // Set annotation metadata as actual elements so the changes are reflected
         val propertyAnnotationMetadata: AnnotationMetadata = if (elements.size == 1) {
@@ -126,10 +125,8 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 *elements.map { e: MemberElement ->
                     if (e is MethodElement) {
                         return@map object : AnnotationMetadataDelegate {
-                            override fun getAnnotationMetadata(): AnnotationMetadata {
-                                // Exclude type metadata
-                                return e.getAnnotationMetadata().declaredMetadata
-                            }
+                            override fun getAnnotationMetadata(): AnnotationMetadata = // Exclude type metadata
+                                e.getAnnotationMetadata().declaredMetadata
                         }
                     }
                     e
@@ -192,9 +189,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 return this@KotlinPropertyElement
             }
 
-            override fun getAnnotationMetadata(): AnnotationMetadata {
-                return propertyAnnotationMetadata
-            }
+            override fun getAnnotationMetadata(): AnnotationMetadata = propertyAnnotationMetadata
         }
     }
     constructor(classElement: ClassElement,
@@ -207,7 +202,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 excluded : Boolean = false) : super(getter, elementAnnotationMetadataFactory, visitorContext) {
         this.name = name
         this.type = type
-        this.exc = excluded
+        this.excluded = excluded
         this.classElement = classElement
         this.setter = Optional.ofNullable(setter)
             .map { method ->
@@ -223,8 +218,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
 
         // The instance AnnotationMetadata of each element can change after a modification
         // Set annotation metadata as actual elements so the changes are reflected
-        val propertyAnnotationMetadata: AnnotationMetadata
-        propertyAnnotationMetadata = if (elements.size == 1) {
+        val propertyAnnotationMetadata: AnnotationMetadata = if (elements.size == 1) {
             elements.iterator().next()
         } else {
             AnnotationMetadataHierarchy(
@@ -232,10 +226,8 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 *elements.stream().map { e: MemberElement ->
                     if (e is MethodElement) {
                         return@map object : AnnotationMetadataDelegate {
-                            override fun getAnnotationMetadata(): AnnotationMetadata {
-                                // Exclude type metadata
-                                return e.getAnnotationMetadata().declaredMetadata
-                            }
+                            override fun getAnnotationMetadata(): AnnotationMetadata = // Exclude type metadata
+                                e.getAnnotationMetadata().declaredMetadata
                         }
                     }
                     e
@@ -298,9 +290,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 return this@KotlinPropertyElement
             }
 
-            override fun getAnnotationMetadata(): AnnotationMetadata {
-                return propertyAnnotationMetadata
-            }
+            override fun getAnnotationMetadata(): AnnotationMetadata = propertyAnnotationMetadata
         }
     }
 
@@ -324,12 +314,11 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         this.setter.ifPresent { elements.add(it) }
         this.getter.ifPresent { elements.add(it) }
         this.field.ifPresent { elements.add(it) }
-        this.exc = excluded
+        this.excluded = excluded
 
         // The instance AnnotationMetadata of each element can change after a modification
         // Set annotation metadata as actual elements so the changes are reflected
-        val propertyAnnotationMetadata: AnnotationMetadata
-        propertyAnnotationMetadata = if (elements.size == 1) {
+        val propertyAnnotationMetadata: AnnotationMetadata = if (elements.size == 1) {
             elements.iterator().next().declaredMetadata
         } else {
             AnnotationMetadataHierarchy(
@@ -337,10 +326,8 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 *elements.stream().map { e: MemberElement ->
                     if (e is MethodElement) {
                         return@map object : AnnotationMetadataDelegate {
-                            override fun getAnnotationMetadata(): AnnotationMetadata {
-                                // Exclude type metadata
-                                return e.getAnnotationMetadata().declaredMetadata
-                            }
+                            override fun getAnnotationMetadata(): AnnotationMetadata = // Exclude type metadata
+                                e.getAnnotationMetadata().declaredMetadata
                         }
                     }
                     e
@@ -403,9 +390,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 return this@KotlinPropertyElement
             }
 
-            override fun getAnnotationMetadata(): AnnotationMetadata {
-                return propertyAnnotationMetadata
-            }
+            override fun getAnnotationMetadata(): AnnotationMetadata = propertyAnnotationMetadata
         }
     }
 
@@ -443,42 +428,27 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         }
     }
 
-    override fun isExcluded(): Boolean {
-        return this.exc
-    }
+    override fun isExcluded() = excluded
 
-    override fun getGenericType(): ClassElement {
-        return internalReturnType
-    }
+    override fun getGenericType() = internalGenericType
 
-    override fun getAnnotationMetadata(): MutableAnnotationMetadataDelegate<*> {
-        return this.annotationMetadata!!
-    }
+    override fun getAnnotationMetadata() = annotationMetadata!!
 
-    override fun getField(): Optional<FieldElement> {
-        return this.field
-    }
+    override fun getField() = field
 
-    override fun getName(): String = name
-    override fun getModifiers(): MutableSet<ElementModifier> {
-        return super<AbstractKotlinElement>.getModifiers()
-    }
+    override fun getName() = name
 
-    override fun getType(): ClassElement = type
+    override fun getModifiers() = super<AbstractKotlinElement>.getModifiers()
 
-    override fun getDeclaringType(): ClassElement {
-        return internalDeclaringType
-    }
+    override fun getType() = type
 
-    override fun getOwningType(): ClassElement = classElement
+    override fun getDeclaringType() = internalDeclaringType
 
-    override fun getReadMethod(): Optional<MethodElement> = getter
+    override fun getOwningType() = classElement
 
-    override fun getWriteMethod(): Optional<MethodElement> = setter
+    override fun getReadMethod() = getter
 
-    override fun isReadOnly(): Boolean {
-        return !setter.isPresent || setter.get().isPrivate
-    }
+    override fun getWriteMethod() = setter
 
     override fun copyThis(): AbstractKotlinElement<KSNode> {
         if (nativeType is KSPropertyDeclaration) {
@@ -489,7 +459,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 property,
                 annotationMetadataFactory,
                 visitorContext,
-                exc
+                excluded
             )
         } else {
             val getter : KSFunctionDeclaration = nativeType as KSFunctionDeclaration
@@ -501,35 +471,24 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 setter.map { it.nativeType as KSFunctionDeclaration }.orElse(null),
                 annotationMetadataFactory,
                 visitorContext,
-                exc
+                excluded
             )
         }
     }
 
     override fun isAbstract() = abstract
 
-    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): MemberElement {
-        return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as MemberElement
-    }
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata) =
+        super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as MemberElement
 
-    override fun isPrimitive(): Boolean {
-        return type.isPrimitive
-    }
+    override fun isPrimitive() = type.isPrimitive
 
-    override fun isArray(): Boolean {
-        return type.isArray
-    }
+    override fun isArray() = type.isArray
 
-    override fun getArrayDimensions(): Int {
-        return type.arrayDimensions
-    }
+    override fun getArrayDimensions() = type.arrayDimensions
 
-    override fun isDeclaredNullable(): Boolean {
-        return type is KotlinClassElement && type.kotlinType.isMarkedNullable
-    }
+    override fun isDeclaredNullable() = type is KotlinClassElement && type.kotlinType.isMarkedNullable
 
-    override fun isNullable(): Boolean {
-        return type is KotlinClassElement && type.kotlinType.isMarkedNullable
-    }
+    override fun isNullable() = type is KotlinClassElement && type.kotlinType.isMarkedNullable
 
 }

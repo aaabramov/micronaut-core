@@ -152,6 +152,8 @@ class AbstractKotlinCompilerSpec extends Specification {
                 if (reconstructTypeSignature(bounds[0]) != 'Object') {
                     name += bounds.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " : ", ""))
                 }
+            } else if (genericPlaceholderElement.resolved) {
+                return reconstructTypeSignature(genericPlaceholderElement.resolved.get())
             }
             return name
         } else if (classElement.isWildcard()) {

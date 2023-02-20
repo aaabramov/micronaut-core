@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.util.ArrayUtils
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.kotlin.processing.getBinaryName
 import io.micronaut.kotlin.processing.getVisibility
 import io.micronaut.kotlin.processing.kspNode
 import io.micronaut.kotlin.processing.unwrap
@@ -29,7 +30,7 @@ import java.util.function.Supplier
 import kotlin.jvm.Throws
 
 @OptIn(KspExperimental::class)
-open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElement {
+open class KotlinMethodElement : AbstractKotlinElement<KSAnnotated>, MethodElement {
 
     private val name: String
     private val owningType: ClassElement
@@ -40,11 +41,11 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         }
         val owner = getOwningType()
         if (parent is KSClassDeclaration) {
-            val className = parent.qualifiedName.toString()
+            val className = parent.getBinaryName(visitorContext.resolver, visitorContext)
             if (owner.name.equals(className)) {
                 owner
             } else {
-                var parentTypeArguments = owner.getTypeArguments(className)
+                val parentTypeArguments = owner.getTypeArguments(className)
                 newClassElement(parent.asStarProjectedType(), parentTypeArguments)
             }
         } else {
@@ -60,7 +61,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         }
     }
 
-    private var parameterInit : Supplier<List<ParameterElement>> = Supplier { emptyList() }
+    private var parameterInit: Supplier<List<ParameterElement>> = Supplier { emptyList() }
     private val parameters: List<ParameterElement> by lazy {
         parameterInit.get()
     }
@@ -70,6 +71,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
             is KotlinClassElement -> {
                 newClassElement(rt.kotlinType, declaringType.typeArguments)
             }
+
             else -> {
                 rt
             }
@@ -80,14 +82,15 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     private val private: Boolean
     private val protected: Boolean
     private val internal: Boolean
-    private val propertyElement : KotlinPropertyElement?
+    private val propertyElement: KotlinPropertyElement?
 
-    constructor(propertyType : ClassElement,
-                propertyElement: KotlinPropertyElement,
-                method: KSPropertySetter,
-                owningType: ClassElement,
-                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                visitorContext: KotlinVisitorContext
+    constructor(
+        propertyType: ClassElement,
+        propertyElement: KotlinPropertyElement,
+        method: KSPropertySetter,
+        owningType: ClassElement,
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+        visitorContext: KotlinVisitorContext
     ) : super(KSPropertySetterReference(method), elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.propertyElement = propertyElement
@@ -127,11 +130,12 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         this.internal = method.receiver.isInternal()
     }
 
-    constructor(method: KSFunctionDeclaration,
-                owningType: ClassElement,
-                returnType: ClassElement,
-                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                visitorContext: KotlinVisitorContext
+    constructor(
+        method: KSFunctionDeclaration,
+        owningType: ClassElement,
+        returnType: ClassElement,
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+        visitorContext: KotlinVisitorContext
     ) : super(KSFunctionReference(method), elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.owningType = owningType
@@ -139,7 +143,8 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
             method.parameters.map {
                 val t = visitorContext.elementFactory.newClassElement(
                     it.type.resolve(),
-                    elementAnnotationMetadataFactory)
+                    elementAnnotationMetadataFactory
+                )
                 KotlinParameterElement(
                     t,
                     this,
@@ -158,18 +163,19 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         this.internal = method.isInternal()
     }
 
-    protected constructor(method: KSAnnotated,
-                          name: String,
-                          owningType: ClassElement,
-                          elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                          visitorContext: KotlinVisitorContext,
-                          returnType: ClassElement,
-                          parameters: List<ParameterElement>,
-                          abstract: Boolean,
-                          public: Boolean,
-                          private: Boolean,
-                          protected: Boolean,
-                          internal: Boolean
+    protected constructor(
+        method: KSAnnotated,
+        name: String,
+        owningType: ClassElement,
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+        visitorContext: KotlinVisitorContext,
+        returnType: ClassElement,
+        parameters: List<ParameterElement>,
+        abstract: Boolean,
+        public: Boolean,
+        private: Boolean,
+        protected: Boolean,
+        internal: Boolean
     ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
         this.name = name
         this.owningType = owningType
@@ -185,38 +191,32 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         this.internal = internal
     }
 
-
     override fun isSynthetic(): Boolean {
-        return if (declaration is KSPropertyGetter || declaration is KSPropertySetter) {
-            return true
-        } else {
-            if (declaration is KSFunctionDeclaration) {
-                return declaration.functionKind != FunctionKind.MEMBER && declaration.functionKind != FunctionKind.STATIC
-            } else {
-                return false
+        return when (declaration) {
+            is KSPropertyGetter, is KSPropertySetter -> {
+                true
+            }
+            is KSFunctionDeclaration -> {
+                declaration.functionKind != FunctionKind.MEMBER && declaration.functionKind != FunctionKind.STATIC
+            }
+            else -> {
+                false
             }
         }
     }
 
-    override fun isFinal(): Boolean {
-        return if (declaration is KSPropertyGetter || declaration is KSPropertySetter) {
-            true
-        } else  {
-            super<AbstractKotlinElement>.isFinal()
-        }
+    override fun isFinal() = if (declaration is KSPropertyGetter || declaration is KSPropertySetter) {
+        true
+    } else {
+        super<AbstractKotlinElement>.isFinal()
     }
 
-    override fun getModifiers(): MutableSet<ElementModifier> {
-        return super<AbstractKotlinElement>.getModifiers()
-    }
+    override fun getModifiers() = super<AbstractKotlinElement>.getModifiers()
 
-    override fun getDeclaredTypeArguments(): Map<String, ClassElement> {
-        return internalDeclaredTypeArguments
-    }
+    override fun getDeclaredTypeArguments() = internalDeclaredTypeArguments
 
-    override fun getDeclaredTypeVariables(): MutableList<out GenericPlaceholderElement> {
-        return declaredTypeArguments.values.map { it as GenericPlaceholderElement }.toMutableList()
-    }
+    override fun getDeclaredTypeVariables() =
+        declaredTypeArguments.values.map { it as GenericPlaceholderElement }.toMutableList()
 
     override fun isSuspend(): Boolean {
         val nativeType = nativeType
@@ -243,7 +243,6 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
                     )
                 }.orElse(null)
             if (continuationParameter != null) {
-
                 ArrayUtils.concat(parameters, continuationParameter)
             } else {
                 parameters
@@ -266,10 +265,8 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         return false
     }
 
-    override fun hides(memberElement: MemberElement?): Boolean {
-        // not sure how to implement this correctly for Kotlin
-        return false
-    }
+    override fun hides(memberElement: MemberElement?) = // not sure how to implement this correctly for Kotlin
+        false
 
     override fun withNewOwningType(owningType: ClassElement): MethodElement {
         val newMethod = KotlinMethodElement(
@@ -290,35 +287,26 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         return newMethod
     }
 
-    override fun getName(): String {
-        return name
-    }
+    override fun getName() = name
 
-    override fun getOwningType(): ClassElement {
-        return owningType
-    }
+    override fun getOwningType() = owningType
 
-    override fun getDeclaringType(): ClassElement {
-        return internalDeclaringType
-    }
+    override fun getDeclaringType() = internalDeclaringType
 
-    override fun getReturnType(): ClassElement {
-        return returnType
-    }
+    override fun getReturnType() = returnType
 
-    override fun getGenericReturnType(): ClassElement {
-        return internalGenericReturnType
-    }
+    override fun getGenericReturnType() = internalGenericReturnType
 
-    override fun getParameters(): Array<ParameterElement> {
-        return parameters.toTypedArray()
-    }
+    override fun getParameters() = parameters.toTypedArray()
 
-    override fun isAbstract(): Boolean = abstract
+    override fun isAbstract() = abstract
 
-    override fun isPublic(): Boolean = public
+    override fun isPublic() = public
 
-    override fun isProtected(): Boolean = protected
+    override fun isProtected() = protected
+
+    override fun isPrivate() = private
+
     override fun copyThis(): KotlinMethodElement {
         if (declaration is KSPropertySetter) {
             return KotlinMethodElement(
@@ -347,7 +335,6 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
                 visitorContext
             )
         } else {
-
             return KotlinMethodElement(
                 declaration,
                 name,
@@ -365,10 +352,8 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         }
     }
 
-    override fun isPrivate(): Boolean = private
-    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): MethodElement {
-        return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as MethodElement
-    }
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata) =
+        super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as MethodElement
 
     override fun toString(): String {
         return "$simpleName(" + parameters.joinToString(",") {
@@ -380,20 +365,30 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         } + ")"
     }
 
-    override fun withParameters(vararg newParameters: ParameterElement): MethodElement {
-        return KotlinMethodElement(declaration, name, owningType, annotationMetadataFactory, visitorContext, returnType, newParameters.toList(), abstract, public, private, protected, internal)
-    }
+    override fun withParameters(vararg newParameters: ParameterElement) =
+        KotlinMethodElement(
+            declaration,
+            name,
+            owningType,
+            annotationMetadataFactory,
+            visitorContext,
+            returnType,
+            newParameters.toList(),
+            abstract,
+            public,
+            private,
+            protected,
+            internal
+        )
 
-    override fun getThrownTypes(): Array<ClassElement> {
-        return stringValues(Throws::class.java, "exceptionClasses")
-            .flatMap {
-                val ce = visitorContext.getClassElement(it).orElse(null)
-                if (ce != null) {
-                    listOf(ce)
-                } else {
-                    emptyList()
-                }
-            }.toTypedArray()
-    }
+    override fun getThrownTypes() = stringValues(Throws::class.java, "exceptionClasses")
+        .flatMap {
+            val ce = visitorContext.getClassElement(it).orElse(null)
+            if (ce != null) {
+                listOf(ce)
+            } else {
+                emptyList()
+            }
+        }.toTypedArray()
 
 }

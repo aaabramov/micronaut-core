@@ -31,95 +31,86 @@ class KotlinGenericPlaceholderElement(
     private var upper: KotlinClassElement,
     private var resolved: KotlinClassElement?,
     private var bounds: List<KotlinClassElement>,
-    private var arrayDimensions: Int = 0,
+    arrayDimensions: Int = 0,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext
-) : KotlinClassElement(upper.kotlinType,
+) : KotlinClassElement(
+    upper.kotlinType,
     elementAnnotationMetadataFactory,
     visitorContext,
     upper.resolvedTypeArguments,
     arrayDimensions,
-    true), ArrayableClassElement, GenericPlaceholderElement {
+    true
+), ArrayableClassElement, GenericPlaceholderElement {
 
-    constructor(parameter: KSTypeParameter,
-                resolved: KotlinClassElement?,
-                bounds: List<KotlinClassElement>,
-                arrayDimensions: Int = 0,
-                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                visitorContext: KotlinVisitorContext
-        ) : this(parameter, selectClassElementRepresentingThisPlaceholder(resolved, bounds), resolved, bounds, arrayDimensions, elementAnnotationMetadataFactory, visitorContext) {
-            this.parameter = parameter;
-        }
-
-    override fun copyThis(): KotlinGenericPlaceholderElement {
-        return KotlinGenericPlaceholderElement(
-            parameter,
-            upper,
-            resolved,
-            bounds,
-            arrayDimensions,
-            annotationMetadataFactory,
-            visitorContext)
+    constructor(
+        parameter: KSTypeParameter,
+        resolved: KotlinClassElement?,
+        bounds: List<KotlinClassElement>,
+        arrayDimensions: Int = 0,
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+        visitorContext: KotlinVisitorContext
+    ) : this(
+        parameter,
+        selectClassElementRepresentingThisPlaceholder(resolved, bounds),
+        resolved,
+        bounds,
+        arrayDimensions,
+        elementAnnotationMetadataFactory,
+        visitorContext
+    ) {
+        this.parameter = parameter
     }
 
-    override fun getName(): String {
-        val bounds = parameter.bounds.firstOrNull()
-        if (bounds != null) {
-            return bounds.resolve().declaration.getBinaryName(visitorContext.resolver, visitorContext)
-        }
-        return Object::class.java.name
-    }
+    override fun copyThis() = KotlinGenericPlaceholderElement(
+        parameter,
+        upper,
+        resolved,
+        bounds,
+        arrayDimensions,
+        annotationMetadataFactory,
+        visitorContext
+    )
 
-    override fun getGenericNativeType(): Any {
-        return parameter
-    }
+    override fun isGenericPlaceholder() = true
 
-    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): ClassElement {
-        return super<KotlinClassElement>.withAnnotationMetadata(annotationMetadata)
-    }
+    override fun getGenericNativeType() = parameter
 
-    override fun isArray(): Boolean = arrayDimensions > 0
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata) =
+        super<KotlinClassElement>.withAnnotationMetadata(annotationMetadata)
 
-    override fun getArrayDimensions(): Int = arrayDimensions
+    override fun withArrayDimensions(arrayDimensions: Int) = KotlinGenericPlaceholderElement(
+        parameter,
+        upper,
+        resolved,
+        bounds,
+        arrayDimensions,
+        annotationMetadataFactory,
+        visitorContext
+    )
 
-    override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
-        return KotlinGenericPlaceholderElement(
-            parameter,
-            upper,
-            resolved,
-            bounds,
-            arrayDimensions,
-            annotationMetadataFactory,
-            visitorContext)
-    }
+    override fun getBounds() = bounds
 
-    override fun getBounds(): List<ClassElement> {
-        return bounds;
-    }
+    override fun getVariableName() = parameter.simpleName.asString()
 
-    override fun getVariableName(): String {
-        return parameter.simpleName.asString()
-    }
+    override fun getResolved(): Optional<ClassElement> = Optional.ofNullable(resolved)
 
     override fun getDeclaringElement(): Optional<Element> {
         val classDeclaration = parameter.closestClassDeclaration()
         return Optional.ofNullable(classDeclaration).map {
             visitorContext.elementFactory.newClassElement(
                 classDeclaration!!.asStarProjectedType(),
-                visitorContext.elementAnnotationMetadataFactory)
+                visitorContext.elementAnnotationMetadataFactory
+            )
         }
     }
 
-    override fun foldBoundGenericTypes(fold: Function<ClassElement, ClassElement>): ClassElement? {
-        return fold.apply(this)
-    }
+    override fun foldBoundGenericTypes(fold: Function<ClassElement, ClassElement?>) = fold.apply(this)
 
     companion object {
         private fun selectClassElementRepresentingThisPlaceholder(
             @Nullable resolved: KotlinClassElement?,
             @NonNull bounds: List<KotlinClassElement>
-        ): KotlinClassElement {
-            return resolved ?: WildcardElement.findUpperType(bounds, bounds)
-        }
+        ) = resolved ?: WildcardElement.findUpperType(bounds, bounds)
     }
 }

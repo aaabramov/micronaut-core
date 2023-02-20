@@ -5,6 +5,7 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.WildcardElement
 import spock.lang.Unroll
 
 class KotlinReconstructionSpec extends AbstractKotlinCompilerSpec {
@@ -398,5 +399,190 @@ class Lst<in E> {
             'Map<Any, T>' | 'Map<Any, String>'
             'List<out T>' | 'List<out String>'
             'Lst<in T>'   | 'Lst<in String>'
+    }
+
+    def 'distinguish list types'() {
+        given:
+            def classElement = buildClassElement("example.Test", """
+package example;
+
+import java.util.*;
+
+class Test {
+    var field1: List<*>? = null
+    var field2: List<*>? = null
+    var field3: List<Any>? = null
+}
+""")
+            def rawType = classElement.fields[0].genericType
+            def wildcardType = classElement.fields[1].genericType
+            def objectType = classElement.fields[2].genericType
+
+        expect:
+//            rawType.boundGenericTypes.isEmpty()
+            rawType.typeArguments["E"].type.name == "java.lang.Object"
+            rawType.typeArguments["E"].isRawType()
+            rawType.typeArguments["E"].isWildcard()
+            !rawType.typeArguments["E"].isGenericPlaceholder()
+
+//            wildcardType.boundGenericTypes.size() == 1
+//            wildcardType.boundGenericTypes[0].isWildcard()
+//            wildcardType.typeArguments["E"].type.name == "java.lang.Object"
+//            wildcardType.typeArguments["E"].isWildcard()
+//            !wildcardType.typeArguments["E"].isRawType()
+
+            objectType.boundGenericTypes.size() == 1
+            !objectType.boundGenericTypes[0].isWildcard()
+            objectType.typeArguments["E"].type.name == "java.lang.Object"
+            !objectType.typeArguments["E"].isWildcard()
+            !objectType.typeArguments["E"].isRawType()
+            !objectType.typeArguments["E"].isGenericPlaceholder()
+    }
+
+    def 'distinguish list types 2'() {
+        given:
+            def classElement = buildClassElement("example.Test", """
+package example;
+
+import java.util.*;
+import java.lang.Number;
+
+class Test {
+    var field1: List<*>? = null
+    var field2: List<*>? = null
+    var field3: List<Any>? = null
+    var field4: List<String>? = null
+    var field5: List<out Number>? = null
+}
+""")
+            def rawType = classElement.fields[0].type
+            def wildcardType = classElement.fields[1].type
+            def objectType = classElement.fields[2].type
+            def stringType = classElement.fields[3].type
+            def numberType = classElement.fields[4].type
+
+        expect:
+            rawType.typeArguments["E"].type.name == "java.lang.Object"
+            rawType.typeArguments["E"].isRawType()
+            rawType.typeArguments["E"].isWildcard()
+            !rawType.typeArguments["E"].isGenericPlaceholder()
+
+//            wildcardType.typeArguments["E"].type.name == "java.lang.Object"
+//            wildcardType.typeArguments["E"].isWildcard()
+//            !((WildcardElement)wildcardType.typeArguments["E"]).isBounded()
+//            !wildcardType.typeArguments["E"].isRawType()
+
+            objectType.typeArguments["E"].type.name == "java.lang.Object"
+            !objectType.typeArguments["E"].isWildcard()
+            !objectType.typeArguments["E"].isRawType()
+            !objectType.typeArguments["E"].isGenericPlaceholder()
+
+            stringType.typeArguments["E"].type.name == "java.lang.String"
+            !stringType.typeArguments["E"].isWildcard()
+            !stringType.typeArguments["E"].isRawType()
+            !stringType.typeArguments["E"].isGenericPlaceholder()
+
+            numberType.typeArguments["E"].type.name == "java.lang.Number"
+            numberType.typeArguments["E"].isWildcard()
+            ((WildcardElement)numberType.typeArguments["E"]).isBounded()
+            !numberType.typeArguments["E"].isRawType()
+    }
+
+    def 'distinguish base list type'() {
+        given:
+            def classElement = buildClassElement("example.Test", """
+package example;
+
+import java.util.*;
+import java.lang.Number;
+
+class Test : Base<String>() {
+}
+
+abstract class Base<T> {
+    var field1: List<*>? = null
+    var field2: List<*>? = null
+    var field3: List<Any>? = null
+    var field4: List<T>? = null
+}
+
+""")
+            def rawType = classElement.fields[0].type
+            def wildcardType = classElement.fields[1].type
+            def objectType = classElement.fields[2].type
+            def genericType = classElement.fields[3].type
+
+        expect:
+            rawType.typeArguments["E"].type.name == "java.lang.Object"
+            rawType.typeArguments["E"].isRawType()
+            rawType.typeArguments["E"].isWildcard()
+            !rawType.typeArguments["E"].isGenericPlaceholder()
+
+//            wildcardType.typeArguments["E"].type.name == "java.lang.Object"
+//            wildcardType.typeArguments["E"].isWildcard()
+//            !((WildcardElement)wildcardType.typeArguments["E"]).isBounded()
+//            !wildcardType.typeArguments["E"].isRawType()
+
+            objectType.typeArguments["E"].type.name == "java.lang.Object"
+            !objectType.typeArguments["E"].isWildcard()
+            !objectType.typeArguments["E"].isRawType()
+            !objectType.typeArguments["E"].isGenericPlaceholder()
+
+            genericType.typeArguments["E"].type.name == "java.lang.Object"
+            !genericType.typeArguments["E"].isWildcard()
+            !genericType.typeArguments["E"].isRawType()
+            genericType.typeArguments["E"].isGenericPlaceholder()
+            (genericType.typeArguments["E"] as GenericPlaceholderElement).getResolved().isEmpty()
+    }
+
+    def 'distinguish base list generic type'() {
+        given:
+            def classElement = buildClassElement("example.Test", """
+package example;
+
+import java.util.*;
+import java.lang.Number;
+
+class Test : Base<String>() {
+}
+
+abstract class Base<T> {
+    var field1: List<*>? = null
+    var field2: List<*>? = null
+    var field3: List<Any>? = null
+    var field4: List<T>? = null
+}
+
+""")
+            def rawType = classElement.fields[0].genericType
+            def wildcardType = classElement.fields[1].genericType
+            def objectType = classElement.fields[2].genericType
+            def genericType = classElement.fields[3].genericType
+
+        expect:
+            rawType.typeArguments["E"].type.name == "java.lang.Object"
+            rawType.typeArguments["E"].isRawType()
+            rawType.typeArguments["E"].isWildcard()
+            !rawType.typeArguments["E"].isGenericPlaceholder()
+
+//            wildcardType.typeArguments["E"].type.name == "java.lang.Object"
+//            wildcardType.typeArguments["E"].isWildcard()
+//            !((WildcardElement)wildcardType.typeArguments["E"]).isBounded()
+//            !wildcardType.typeArguments["E"].isRawType()
+
+            objectType.typeArguments["E"].type.name == "java.lang.Object"
+            !objectType.typeArguments["E"].isWildcard()
+            !objectType.typeArguments["E"].isRawType()
+            !objectType.typeArguments["E"].isGenericPlaceholder()
+
+            genericType.typeArguments["E"].type.name == "java.lang.String"
+            !genericType.typeArguments["E"].isWildcard()
+            !genericType.typeArguments["E"].isRawType()
+            genericType.typeArguments["E"].isGenericPlaceholder()
+            def resolved = (genericType.typeArguments["E"] as GenericPlaceholderElement).getResolved().get()
+            resolved.name == "java.lang.String"
+            !resolved.isWildcard()
+            !resolved.isRawType()
+            !resolved.isGenericPlaceholder()
     }
 }

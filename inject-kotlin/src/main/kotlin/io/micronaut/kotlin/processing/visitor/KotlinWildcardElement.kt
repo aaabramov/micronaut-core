@@ -40,13 +40,9 @@ class KotlinWildcardElement(
     false
 ), WildcardElement {
 
-    override fun isRawType(): Boolean {
-        return isRawType;
-    }
+    override fun isRawType() = isRawType
 
-    override fun getGenericNativeType(): Any {
-        return typeArgument
-    }
+    override fun getGenericNativeType() = typeArgument
 
     override fun foldBoundGenericTypes(@NonNull fold: Function<ClassElement?, ClassElement>): ClassElement? {
         val upperBounds: List<KotlinClassElement?> = this.upperBounds
@@ -81,14 +77,17 @@ class KotlinWildcardElement(
     }
 
     private fun toKotlinClassElement(element: ClassElement?): KotlinClassElement? {
-        return if (element == null) {
-            return null
-        } else if (element is KotlinClassElement) {
-            return element
-        } else {
-            if (element.isWildcard || element.isGenericPlaceholder) {
+        return when {
+            element == null -> {
+                null
+            }
+            element is KotlinClassElement -> {
+                element
+            }
+            element.isWildcard || element.isGenericPlaceholder -> {
                 throw UnsupportedOperationException("Cannot convert wildcard / free type variable to JavaClassElement")
-            } else {
+            }
+            else -> {
                 (visitorContext.getClassElement(element.name, elementAnnotationMetadataFactory)
                     .orElseThrow {
                         UnsupportedOperationException(

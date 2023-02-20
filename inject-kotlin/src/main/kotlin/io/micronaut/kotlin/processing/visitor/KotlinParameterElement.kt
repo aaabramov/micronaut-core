@@ -43,42 +43,29 @@ class KotlinParameterElement(
         }
     }
 
-    override fun isPrimitive(): Boolean {
-        return parameterType.isPrimitive
-    }
+    override fun isPrimitive() = parameterType.isPrimitive
 
-    override fun isArray(): Boolean {
-        return parameterType.isArray
-    }
+    override fun isArray() = parameterType.isArray
 
-    override fun copyThis(): AbstractKotlinElement<KSValueParameter> {
-        return KotlinParameterElement(
-            parameterType,
-            methodElement,
-            parameter,
-            annotationMetadataFactory,
-            visitorContext
-        )
-    }
+    override fun copyThis() = KotlinParameterElement(
+        parameterType,
+        methodElement,
+        parameter,
+        annotationMetadataFactory,
+        visitorContext
+    )
 
-    override fun getMethodElement(): MethodElement {
-        return methodElement
-    }
+    override fun getMethodElement() = methodElement
 
-    override fun getName(): String {
-        return internalName
-    }
+    override fun getName() = internalName
 
-    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): ParameterElement {
-        return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ParameterElement
-    }
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata) =
+        super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ParameterElement
 
-    override fun getType(): ClassElement = parameterType
+    override fun getType() = parameterType
 
-    override fun getGenericType(): ClassElement {
-        return internalGenericType
-    }
+    override fun getGenericType() = internalGenericType
 
-    override fun getArrayDimensions(): Int = parameterType.arrayDimensions
+    override fun getArrayDimensions() = parameterType.arrayDimensions
 
 }

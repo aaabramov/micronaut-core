@@ -92,7 +92,6 @@ class KSPropertyGetterReference(
     }
 }
 
-
 class KSFunctionReference(
     private val nt: KSFunctionDeclaration
 ) : KSAnnotatedReference(resolveNativeType(nt, "Function"), nt), KSFunctionDeclaration by nt {
