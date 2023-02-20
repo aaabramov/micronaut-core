@@ -94,6 +94,7 @@ public class AllElementsVisitor implements TypeElementVisitor<Object, Object> {
         initializeTypedElementNoCache(classElement, visited);
         classElement.getSuperType().ifPresent(superType -> initializeClassElement(superType, visited));
         classElement.getFields().forEach(field -> initializeTypedElement(field, visited));
+        classElement.getMethods().forEach(method -> initializeMethodElement(method, visited));
         classElement.getDeclaredGenericPlaceholders();
         classElement.getSyntheticBeanProperties();
         classElement.getBeanProperties().forEach(AnnotationMetadataProvider::getAnnotationMetadata);

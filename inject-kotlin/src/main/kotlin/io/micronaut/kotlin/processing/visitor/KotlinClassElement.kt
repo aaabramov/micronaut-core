@@ -99,6 +99,9 @@ open class KotlinClassElement(
     private val internalFields: List<FieldElement> by lazy {
         super.getFields()
     }
+    private val internalMethods: List<MethodElement> by lazy {
+        super.getMethods()
+    }
     private val enclosedElementsQuery = KotlinEnclosedElementsQuery()
     private val nativeProperties: List<PropertyElement> by lazy {
         val properties: MutableList<PropertyElement> = ArrayList()
@@ -204,33 +207,28 @@ open class KotlinClassElement(
 
     override fun getSyntheticBeanProperties() = nativeProperties
 
-    override fun getAccessibleStaticCreators(): MutableList<MethodElement> {
+    override fun getAccessibleStaticCreators(): List<MethodElement> {
         val staticCreators: MutableList<MethodElement> = mutableListOf()
         staticCreators.addAll(super.getAccessibleStaticCreators())
         return staticCreators.ifEmpty {
-            val companion = classDeclaration.declarations.filter {
-                it is KSClassDeclaration && it.isCompanionObject
-            }.map { it as KSClassDeclaration }
+            val companion = classDeclaration.declarations
+                .filter { it is KSClassDeclaration && it.isCompanionObject }
+                .map { it as KSClassDeclaration }
                 .map { newKotlinClassElement(it, emptyMap()) }
-                .firstOrNull()
+                .firstOrNull() ?: return emptyList()
 
-            if (companion != null) {
-                return companion.getEnclosedElements(
-                    ElementQuery.ALL_METHODS
-                        .annotated {
-                            it.hasStereotype(
-                                Creator::class.java
-                            )
-                        }
-                        .modifiers { it.isEmpty() || it.contains(ElementModifier.PUBLIC) }
-                        .filter { method ->
-                            method.returnType.isAssignable(this)
-                        }
-                )
-
-            } else {
-                return mutableListOf()
-            }
+            return companion.getEnclosedElements(
+                ElementQuery.ALL_METHODS
+                    .annotated {
+                        it.hasStereotype(
+                            Creator::class.java
+                        )
+                    }
+                    .modifiers { it.isEmpty() || it.contains(ElementModifier.PUBLIC) }
+                    .filter { method ->
+                        method.returnType.isAssignable(this)
+                    }
+            )
         }
     }
 
@@ -239,6 +237,16 @@ open class KotlinClassElement(
     override fun getDeclaredGenericPlaceholders() = internalDeclaredGenericPlaceholders
 
     override fun getFields() = internalFields
+
+    override fun findField(name: String) = Optional.ofNullable(
+        internalFields.firstOrNull { it.name == name }
+    )
+
+    override fun getMethods() = internalMethods
+
+    override fun findMethod(name: String?) = Optional.ofNullable(
+        internalMethods.firstOrNull { it.name == name }
+    )
 
 //    override fun withBoundGenericTypes(typeArguments: MutableList<out ClassElement>?): ClassElement {
 //        if (typeArguments != null && typeArguments.size == kotlinType.declaration.typeParameters.size) {
@@ -671,7 +679,7 @@ open class KotlinClassElement(
         return Optional.empty()
     }
 
-    override fun <T : Element> getEnclosedElements(query: ElementQuery<T>) =
+    override fun <T : Element> getEnclosedElements(query: ElementQuery<T>): List<T> =
         enclosedElementsQuery.getEnclosedElements(this, query)
 
     private inner class KotlinEnclosedElementsQuery : EnclosedElementsQuery<KSClassDeclaration, KSNode>() {

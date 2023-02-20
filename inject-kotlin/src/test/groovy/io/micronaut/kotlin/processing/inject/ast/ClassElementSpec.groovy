@@ -1402,30 +1402,27 @@ class Test {
 //            ce.findMethod("method10").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
 //            ce.findMethod("method10").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
 //    }
-//
-//    void "test inherit parameter annotation"() {
-//        ClassElement ce = buildClassElement('''
-//package test;
-//import java.util.List;
-//
-//interface MyApi {
-//
-//    String get(@io.micronaut.visitors.MyParameter("X-username") String username);
-//}
-//
-//class UserController implements MyApi {
-//
-//    @Override
-//    public String get(String username) {
-//        return null;
-//    }
-//
-//}
-//
-//''')
-//        expect:
-//            ce.findMethod("get").get().getParameters()[0].hasAnnotation(MyParameter)
-//    }
+
+    void "test inherit parameter annotation"() {
+        ClassElement ce = buildClassElement('test.UserController', '''
+package test
+
+import io.micronaut.kotlin.processing.inject.ast.MyParameter
+
+interface MyApi {
+    fun get(@MyParameter("X-username") username: String): String
+}
+
+class UserController : MyApi {
+    override fun get(username: String): String {
+        return "Hello"
+    }
+}
+
+''')
+        expect:
+            ce.findMethod("get").get().getParameters()[0].hasAnnotation(MyParameter)
+    }
 
     void "test interface placeholder"() {
         ClassElement ce = buildClassElement('test.MyRepo', '''

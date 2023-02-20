@@ -216,31 +216,58 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         if (declaredOnly) {
             return mutableListOf(element)
         }
-        if (element is KSClassDeclaration) {
-            val hierarchy = mutableListOf<KSAnnotated>()
-            hierarchy.add(element)
-            if (element.classKind == ClassKind.ANNOTATION_CLASS) {
+        when (element) {
+
+            is KSValueParameter -> {
+                val parent = element.parent
+                if (parent is KSFunctionDeclaration) {
+                    val parameters = parent.parameters
+                    val parameterIndex = parameters.indexOf(parameters.find { it.name == element.name })
+                    return methodsHierarchy(parent)
+                        .map { it.parameters[parameterIndex] }
+                        .toMutableList()
+                }
+                // TODO: setter
+                return mutableListOf()
+            }
+
+            is KSClassDeclaration -> {
+                val hierarchy = mutableListOf<KSAnnotated>()
+                hierarchy.add(element)
+                if (element.classKind == ClassKind.ANNOTATION_CLASS) {
+                    return hierarchy
+                }
+                populateTypeHierarchy(element, hierarchy)
+                hierarchy.reverse()
                 return hierarchy
             }
-            populateTypeHierarchy(element, hierarchy)
-            hierarchy.reverse()
-            return hierarchy
-        } else if (element is KSFunctionDeclaration) {
-            return if (element.isConstructor()) {
-                mutableListOf(element)
-            } else {
-                val hierarchy = mutableListOf<KSAnnotated>(element)
-                var overidden = element.findOverridee()
-                while (overidden != null) {
-                    hierarchy.add(overidden)
-                    overidden = (overidden as KSFunctionDeclaration).findOverridee()
-                }
-                hierarchy
+
+            is KSFunctionDeclaration -> {
+                val methodsHierarchy = methodsHierarchy(element)
+                val hierarchy = mutableListOf<KSAnnotated>()
+                hierarchy.addAll(methodsHierarchy)
+                return hierarchy
             }
-        } else {
-            return mutableListOf(element)
+
+            else -> {
+                return mutableListOf(element)
+            }
         }
     }
+
+    private fun methodsHierarchy(element: KSFunctionDeclaration): List<KSFunctionDeclaration> =
+        if (element.isConstructor()) {
+            listOf(element)
+        } else {
+            val hierarchy = mutableListOf(element)
+            var overriden = element.findOverridee() as KSFunctionDeclaration?
+            while (overriden != null) {
+                hierarchy.add(overriden)
+                overriden = overriden.findOverridee() as KSFunctionDeclaration?
+            }
+            hierarchy.reverse()
+            hierarchy
+        }
 
     override fun readAnnotationRawValues(
         originatingElement: KSAnnotated,
