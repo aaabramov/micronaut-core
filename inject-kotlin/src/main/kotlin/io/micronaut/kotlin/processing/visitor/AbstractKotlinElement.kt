@@ -23,17 +23,14 @@ import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.ElementModifier
-import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.ElementMutableAnnotationMetadataDelegate
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
-import io.micronaut.kotlin.processing.getBinaryName
 import io.micronaut.kotlin.processing.unwrap
 import java.util.*
 import java.util.function.Consumer
 import java.util.function.Predicate
-import javax.lang.model.element.TypeElement
 
 abstract class AbstractKotlinElement<T : KSNode>(
     val declaration: T,
@@ -225,65 +222,81 @@ abstract class AbstractKotlinElement<T : KSNode>(
         return this
     }
 
+    protected fun resolveTypeParameter(
+        typeParameter: KSTypeParameter,
+        parentTypeArguments: Map<String, ClassElement>,
+    ) = resolveTypeParameter(typeParameter, parentTypeArguments, HashSet())
+
     protected fun resolveTypeArguments(
         type: KSDeclaration,
         parentTypeArguments: Map<String, ClassElement>
+    ) = resolveTypeArguments(type, parentTypeArguments, HashSet())
+
+    private fun resolveTypeArguments(
+        type: KSDeclaration,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>
     ): Map<String, ClassElement> {
         val typeArguments = mutableMapOf<String, ClassElement>()
         val typeParameters = type.typeParameters
         typeParameters.forEachIndexed { i, typeParameter ->
-            val bounds = resolveBounds(typeParameter, parentTypeArguments)
             typeArguments[typeParameters[i].name.asString()] =
-                KotlinGenericPlaceholderElement(
-                    typeParameter,
-                    null,
-                    bounds,
-                    0,
-                    annotationMetadataFactory,
-                    visitorContext
-                )
+                resolveTypeParameter(typeParameter, parentTypeArguments, visitedTypes)
         }
         return typeArguments
     }
 
-    private fun resolveBounds(
+    private fun resolveTypeParameter(
         typeParameter: KSTypeParameter,
-        parentTypeArguments: Map<String, ClassElement>
-    ): List<KotlinClassElement> {
-        return typeParameter.bounds.map {
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>
+    ): ClassElement {
+        val variableName = typeParameter.name.asString()
+        val bounded = parentTypeArguments[variableName]
+
+        if (bounded != null) {
+            return bounded
+        }
+
+        val stripTypeArguments = !visitedTypes.add(typeParameter)
+
+        val bounds = typeParameter.bounds.map {
             val argumentType = it.resolve()
-            newKotlinClassElement(argumentType, parentTypeArguments)
+            newKotlinClassElement(argumentType, parentTypeArguments, visitedTypes, stripTypeArguments)
         }.ifEmpty {
-            mutableListOf(
-                visitorContext.getClassElement(Object::class.java.name).get() as KotlinClassElement
-            ).asSequence()
+            mutableListOf(getJavaObjectClassElement()).asSequence()
         }.toList()
+
+        return KotlinGenericPlaceholderElement(
+            typeParameter,
+            null,
+            bounds,
+            0,
+            annotationMetadataFactory,
+            visitorContext
+        )
     }
 
-    protected fun resolveTypeArguments(
+    private fun getJavaObjectClassElement() =
+        visitorContext.getClassElement(Object::class.java.name).get() as KotlinClassElement
+
+    private fun resolveTypeArguments(
         type: KSType,
-        parentTypeArguments: Map<String, ClassElement>
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>
     ): Map<String, ClassElement> {
         val typeArguments = mutableMapOf<String, ClassElement>()
         val typeParameters = type.declaration.typeParameters
         if (type.arguments.isEmpty()) {
             typeParameters.forEach {
-                val variableName = it.name.asString()
-                val bounded = parentTypeArguments[variableName]
-                if (bounded == null) {
-                    val bounds = resolveBounds(it, parentTypeArguments)
-                    typeArguments[variableName] =
-                        KotlinGenericPlaceholderElement(it, null, bounds, 0, annotationMetadataFactory, visitorContext)
-                } else {
-                    typeArguments[variableName] = bounded
-                }
+                typeArguments[it.name.asString()] = resolveTypeParameter(it, parentTypeArguments, visitedTypes)
             }
         } else {
             type.arguments.forEachIndexed { i, typeArgument ->
                 val variableName = typeParameters[i].name.asString()
                 val bounded = parentTypeArguments[variableName]
                 if (bounded == null) {
-                    typeArguments[variableName] = resolveTypeArgument(typeArgument, parentTypeArguments)
+                    typeArguments[variableName] = resolveTypeArgument(typeArgument, parentTypeArguments, visitedTypes)
                 } else {
                     typeArguments[variableName] = bounded
                 }
@@ -292,29 +305,42 @@ abstract class AbstractKotlinElement<T : KSNode>(
         return typeArguments
     }
 
+    private fun resolveEmptyTypeArguments(type: KSType): Map<String, ClassElement> {
+        val objectElement = visitorContext.getClassElement(Object::class.java.name).get()
+        val typeArguments = mutableMapOf<String, ClassElement>()
+        val typeParameters = type.declaration.typeParameters
+        typeParameters.forEach {
+            typeArguments[it.name.asString()] = objectElement
+        }
+        return typeArguments
+    }
+
     private fun resolveTypeArgument(
         typeArgument: KSTypeArgument,
-        parentTypeArguments: Map<String, ClassElement>
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>
     ): ClassElement {
         return when (typeArgument.variance) {
             Variance.STAR, Variance.COVARIANT, Variance.CONTRAVARIANT -> KotlinWildcardElement( // example List<*>
-                resolveUpperBounds(typeArgument, parentTypeArguments),
-                resolveLowerBounds(typeArgument, parentTypeArguments),
+                typeArgument,
+                resolveUpperBounds(typeArgument, parentTypeArguments, visitedTypes),
+                resolveLowerBounds(typeArgument, parentTypeArguments, visitedTypes),
                 annotationMetadataFactory,
                 visitorContext
             )
             // other cases
-            else -> newKotlinClassElement(typeArgument.type!!.resolve(), parentTypeArguments)
+            else -> newKotlinClassElement(typeArgument.type!!.resolve(), parentTypeArguments, visitedTypes)
         }
     }
 
     private fun resolveLowerBounds(
         arg: KSTypeArgument,
-        parentTypeArguments: Map<String, ClassElement>
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>
     ): List<KotlinClassElement?> {
         return if (arg.variance == Variance.CONTRAVARIANT) {
             listOf(
-                newKotlinClassElement(arg.type?.resolve()!!, parentTypeArguments)
+                newKotlinClassElement(arg.type?.resolve()!!, parentTypeArguments, visitedTypes)
             )
         } else {
             return emptyList()
@@ -323,24 +349,60 @@ abstract class AbstractKotlinElement<T : KSNode>(
 
     private fun resolveUpperBounds(
         arg: KSTypeArgument,
-        parentTypeArguments: Map<String, ClassElement>
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>
     ): List<KotlinClassElement?> {
         return if (arg.variance == Variance.COVARIANT) {
             listOf(
-                newKotlinClassElement(arg.type?.resolve()!!, parentTypeArguments)
+                newKotlinClassElement(arg.type?.resolve()!!, parentTypeArguments, visitedTypes)
             )
         } else {
             val objectType = visitorContext.resolver.getClassDeclarationByName(Object::class.java.name)!!
             listOf(
-                newKotlinClassElement(objectType.asStarProjectedType(), parentTypeArguments)
+                newKotlinClassElement(objectType.asStarProjectedType(), parentTypeArguments, visitedTypes)
             )
         }
     }
 
+    protected fun newKotlinClassElement(
+        annotated: KSAnnotated,
+        parentTypeArguments: Map<String, ClassElement>,
+    ) = newKotlinClassElement(annotated, parentTypeArguments, HashSet())
+
+    protected fun newKotlinClassElement(
+        type: KSType,
+        parentTypeArguments: Map<String, ClassElement>,
+    ) = newKotlinClassElement(type, parentTypeArguments, HashSet())
+
+    private fun newKotlinClassElement(
+        annotated: KSAnnotated,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>
+    ) = newClassElement(annotated, parentTypeArguments, visitedTypes, false) as KotlinClassElement
+
+    private fun newKotlinClassElement(
+        type: KSType,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>,
+        stripTypeArguments: Boolean = false,
+    ) = newClassElement(type, parentTypeArguments, visitedTypes, false, stripTypeArguments) as KotlinClassElement
+
     protected fun newClassElement(
         type: KSType,
         parentTypeArguments: Map<String, ClassElement>,
-        allowPrimitive: Boolean = true
+    ) = newClassElement(type, parentTypeArguments, HashSet())
+
+    protected fun newClassElement(
+        annotated: KSAnnotated,
+        parentTypeArguments: Map<String, ClassElement>,
+    ) = newClassElement(annotated, parentTypeArguments, HashSet())
+
+    private fun newClassElement(
+        type: KSType,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>,
+        allowPrimitive: Boolean = true,
+        stripTypeArguments: Boolean = false
     ): ClassElement {
         val declaration = type.declaration
         val qualifiedName = declaration.qualifiedName!!.asString()
@@ -351,18 +413,10 @@ abstract class AbstractKotlinElement<T : KSNode>(
         }
         if (qualifiedName == "kotlin.Array") {
             val component = type.arguments[0].type!!.resolve()
-            val componentElement = newClassElement(component, parentTypeArguments, allowPrimitive)
+            val componentElement = newClassElement(component, parentTypeArguments, visitedTypes, allowPrimitive)
             return componentElement.toArray()
         } else if (declaration is KSTypeParameter) {
-            val bounds = resolveBounds(declaration, parentTypeArguments)
-            return KotlinGenericPlaceholderElement(
-                declaration,
-                null,
-                bounds,
-                0,
-                annotationMetadataFactory,
-                visitorContext
-            )
+            return resolveTypeParameter(declaration, parentTypeArguments, visitedTypes)
         }
         if (allowPrimitive && !type.isMarkedNullable) {
             element = KotlinElementFactory.primitives[qualifiedName]
@@ -370,32 +424,18 @@ abstract class AbstractKotlinElement<T : KSNode>(
                 return element
             }
         }
+        val typeArguments = if (stripTypeArguments) resolveEmptyTypeArguments(type) else resolveTypeArguments(type, parentTypeArguments, visitedTypes)
         return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
-            val typeArguments = resolveTypeArguments(type, parentTypeArguments)
             KotlinEnumElement(type, annotationMetadataFactory, visitorContext, typeArguments)
         } else {
-            val typeArguments = resolveTypeArguments(type, parentTypeArguments)
             KotlinClassElement(type, annotationMetadataFactory, visitorContext, typeArguments)
         }
     }
 
-    protected fun newKotlinClassElement(
-        annotated: KSAnnotated,
-        parentTypeArguments: Map<String, ClassElement>
-    ): KotlinClassElement {
-        return newClassElement(annotated, parentTypeArguments, false) as KotlinClassElement
-    }
-
-    protected fun newKotlinClassElement(
-        type: KSType,
-        parentTypeArguments: Map<String, ClassElement>
-    ): KotlinClassElement {
-        return newClassElement(type, parentTypeArguments, false) as KotlinClassElement
-    }
-
-    protected fun newClassElement(
+    private fun newClassElement(
         annotated: KSAnnotated,
         parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>,
         allowPrimitive: Boolean = true
     ): ClassElement {
         val type = KotlinClassElement.getType(annotated, visitorContext)
@@ -408,18 +448,10 @@ abstract class AbstractKotlinElement<T : KSNode>(
         }
         if (qualifiedName == "kotlin.Array") {
             val component = type.arguments[0].type!!.resolve()
-            val componentElement = newClassElement(component, parentTypeArguments, allowPrimitive)
+            val componentElement = newClassElement(component, parentTypeArguments, visitedTypes, allowPrimitive)
             return componentElement.toArray()
         } else if (declaration is KSTypeParameter) {
-            val bounds = resolveBounds(declaration, parentTypeArguments)
-            return KotlinGenericPlaceholderElement(
-                declaration,
-                null,
-                bounds,
-                0,
-                annotationMetadataFactory,
-                visitorContext
-            )
+            return resolveTypeParameter(declaration, parentTypeArguments, visitedTypes)
         }
         if (allowPrimitive && !type.isMarkedNullable) {
             element = KotlinElementFactory.primitives[qualifiedName]
@@ -427,11 +459,10 @@ abstract class AbstractKotlinElement<T : KSNode>(
                 return element
             }
         }
+        val typeArguments = resolveTypeArguments(type, parentTypeArguments, visitedTypes)
         return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
-            val typeArguments = resolveTypeArguments(type, parentTypeArguments)
             KotlinEnumElement(type, annotationMetadataFactory, visitorContext, typeArguments)
         } else {
-            val typeArguments = resolveTypeArguments(type, parentTypeArguments)
             KotlinClassElement(annotated, annotationMetadataFactory, visitorContext, typeArguments)
         }
     }
@@ -474,36 +505,36 @@ abstract class AbstractKotlinElement<T : KSNode>(
 //        return resolvedType
 //    }
 
-    private fun resolveTypeArgument(
-        arg: KSTypeArgument,
-        boundInfo: Map<String, KSType>,
-        visitorContext: KotlinVisitorContext
-    ): ClassElement {
-        val n = arg.type?.toString()
-        val resolved = boundInfo[n]
-        return if (resolved != null) {
-            newKotlinClassElement(resolved, emptyMap())
-        } else {
-            if (arg.type != null) {
-                val t = arg.type!!.resolve()
-                if (t.arguments.isNotEmpty()) {
-                    newKotlinClassElement(
-                        t,
-                        emptyMap()
-                    )
-//                        .withBoundGenericTypes(
-//                        t.arguments.map {
-//                            resolveTypeArgument(it, boundInfo, visitorContext)
-//                        }
+//    private fun resolveTypeArgument(
+//        arg: KSTypeArgument,
+//        boundInfo: Map<String, KSType>,
+//        visitorContext: KotlinVisitorContext
+//    ): ClassElement {
+//        val n = arg.type?.toString()
+//        val resolved = boundInfo[n]
+//        return if (resolved != null) {
+//            newKotlinClassElement(resolved, emptyMap())
+//        } else {
+//            if (arg.type != null) {
+//                val t = arg.type!!.resolve()
+//                if (t.arguments.isNotEmpty()) {
+//                    newKotlinClassElement(
+//                        t,
+//                        emptyMap()
 //                    )
-                } else {
-                    newKotlinClassElement(t, emptyMap())
-                }
-            } else {
-                visitorContext.getClassElement(Object::class.java.name).get()
-            }
-        }
-    }
+////                        .withBoundGenericTypes(
+////                        t.arguments.map {
+////                            resolveTypeArgument(it, boundInfo, visitorContext)
+////                        }
+////                    )
+//                } else {
+//                    newKotlinClassElement(t, emptyMap())
+//                }
+//            } else {
+//                visitorContext.getClassElement(Object::class.java.name).get()
+//            }
+//        }
+//    }
 
     override fun toString(): String {
         return getDescription(false)
@@ -519,6 +550,5 @@ abstract class AbstractKotlinElement<T : KSNode>(
     override fun hashCode(): Int {
         return nativeType.hashCode()
     }
-
 
 }

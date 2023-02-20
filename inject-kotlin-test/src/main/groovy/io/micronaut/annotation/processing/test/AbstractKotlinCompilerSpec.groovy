@@ -135,7 +135,7 @@ class AbstractKotlinCompilerSpec extends Specification {
             if (typeVarsAsDeclarations) {
                 def bounds = freeVar.bounds
                 if (reconstructTypeSignature(bounds[0]) != 'Object') {
-                    name += bounds.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " out ", ""))
+                    name += bounds.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " : ", ""))
                 }
             }
             return name
@@ -149,12 +149,13 @@ class AbstractKotlinCompilerSpec extends Specification {
                 return we.upperBounds.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", "out ", ""))
             }
         } else {
-            def boundTypeArguments = classElement.getBoundGenericTypes()
-            if (boundTypeArguments.isEmpty()) {
+            def typeArguments = classElement.getTypeArguments().values()
+            if (typeArguments.isEmpty()) {
+                return classElement.getSimpleName()
+            } else if (typeArguments.stream().allMatch { it.isRawType() }) {
                 return classElement.getSimpleName()
             } else {
-                return classElement.getSimpleName() +
-                        boundTypeArguments.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
+                return classElement.getSimpleName() + typeArguments.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
             }
         }
     }

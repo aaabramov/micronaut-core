@@ -16,6 +16,7 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.symbol.KSType
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementModifier
@@ -29,18 +30,14 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
 ) : AbstractKotlinElement<KSPropertyDeclaration>(KSPropertyReference(declaration), elementAnnotationMetadataFactory, visitorContext), FieldElement {
 
     private val internalName = declaration.simpleName.asString()
-    private val internalType : ClassElement by lazy {
-        newClassElement(declaration.type.resolve(), emptyMap())
+    private val internalKSType: KSType by lazy {
+        declaration.type.resolve()
     }
-    private val internalReturnType: ClassElement by lazy {
-        when (val t = type) {
-            is KotlinClassElement -> {
-                newClassElement(t.kotlinType, declaringType.typeArguments)
-            }
-            else -> {
-                t
-            }
-        }
+    private val internalType : ClassElement by lazy {
+        newClassElement(internalKSType, emptyMap())
+    }
+    private val internalGenericType: ClassElement by lazy {
+        newClassElement(internalKSType, declaringType.typeArguments)
     }
 
     override fun isFinal(): Boolean {
@@ -67,12 +64,12 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
         return internalType
     }
 
-    override fun getName(): String {
-        return internalName
+    override fun getGenericType(): ClassElement {
+        return internalGenericType
     }
 
-    override fun getGenericType(): ClassElement {
-        return internalReturnType
+    override fun getName(): String {
+        return internalName
     }
 
     override fun isPrimitive(): Boolean {

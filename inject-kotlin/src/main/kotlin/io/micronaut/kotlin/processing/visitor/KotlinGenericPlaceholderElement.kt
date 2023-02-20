@@ -26,18 +26,9 @@ import io.micronaut.kotlin.processing.getBinaryName
 import java.util.*
 import java.util.function.Function
 
-//JavaNativeElement.Placeholder genericNativeType,
-//TypeVariable realTypeVariable,
-//@NonNull Element declaredElement,
-//@Nullable JavaClassElement resolved,
-//@NonNull List<JavaClassElement> bounds,
-//@NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
-//int arrayDimensions,
-//boolean isRawType
-
 class KotlinGenericPlaceholderElement(
     private var parameter: KSTypeParameter,
-    upper: KotlinClassElement,
+    private var upper: KotlinClassElement,
     private var resolved: KotlinClassElement?,
     private var bounds: List<KotlinClassElement>,
     private var arrayDimensions: Int = 0,
@@ -63,6 +54,7 @@ class KotlinGenericPlaceholderElement(
     override fun copyThis(): KotlinGenericPlaceholderElement {
         return KotlinGenericPlaceholderElement(
             parameter,
+            upper,
             resolved,
             bounds,
             arrayDimensions,
@@ -75,11 +67,15 @@ class KotlinGenericPlaceholderElement(
         if (bounds != null) {
             return bounds.resolve().declaration.getBinaryName(visitorContext.resolver, visitorContext)
         }
-        return "java.lang.Object"
+        return Object::class.java.name
+    }
+
+    override fun getGenericNativeType(): Any {
+        return parameter
     }
 
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): ClassElement {
-        return super<KotlinClassElement>.withAnnotationMetadata(annotationMetadata) as ClassElement
+        return super<KotlinClassElement>.withAnnotationMetadata(annotationMetadata)
     }
 
     override fun isArray(): Boolean = arrayDimensions > 0
@@ -89,6 +85,7 @@ class KotlinGenericPlaceholderElement(
     override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
         return KotlinGenericPlaceholderElement(
             parameter,
+            upper,
             resolved,
             bounds,
             arrayDimensions,
@@ -96,7 +93,7 @@ class KotlinGenericPlaceholderElement(
             visitorContext)
     }
 
-    override fun getBounds(): List<out ClassElement> {
+    override fun getBounds(): List<ClassElement> {
         return bounds;
     }
 
@@ -113,27 +110,8 @@ class KotlinGenericPlaceholderElement(
         }
     }
 
-//    override fun equals(other: Any?): Boolean {
-//        if (this === other) return true
-//        if (javaClass != other?.javaClass) return false
-//        if (!super.equals(other)) return false
-//
-//        other as KotlinGenericPlaceholderElement
-//
-//        if (parameter.simpleName.asString() != other.parameter.simpleName.asString()) return false
-//
-//        return true
-//    }
-
-//    override fun hashCode(): Int {
-//        var result = super.hashCode()
-//        result = 31 * result + parameter.simpleName.asString().hashCode()
-//        return result
-//    }
-
-    override fun foldBoundGenericTypes(fold: Function<ClassElement, ClassElement>?): ClassElement {
-        Objects.requireNonNull(fold, "Function argument cannot be null")
-        return fold!!.apply(this)
+    override fun foldBoundGenericTypes(fold: Function<ClassElement, ClassElement>): ClassElement? {
+        return fold.apply(this)
     }
 
     companion object {

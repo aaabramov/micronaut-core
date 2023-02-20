@@ -2,12 +2,10 @@ package io.micronaut.kotlin.processing.visitor
 
 import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.inject.ast.GenericPlaceholderElement
-import spock.lang.PendingFeature
 import spock.lang.Unroll
 
-
 class KotlinReconstructionSpec extends AbstractKotlinCompilerSpec {
-    @PendingFeature(reason = "Not yet implemented")
+
     @Unroll("field type is #fieldType")
     def 'field type'() {
         given:
@@ -18,6 +16,9 @@ import java.util.*;
 
 class Test<T> {
     lateinit var field : $fieldType
+}
+
+class Lst<in E> {
 }
 """)
         def field = element.getFields()[0]
@@ -32,13 +33,15 @@ class Test<T> {
                 'List<T>',
                 'List<Array<T>>',
                 'List<out CharSequence>',
-//                'List<in CharSequence>', // doesn't work?
                 'List<out Array<T>>',
-                'List<out Array<List<out Array<T>>>>'
+                'List<out Array<T>>',
+                'List<out Array<List<out Array<T>>>>',
+                'Lst<String>',
+                'Lst<in CharSequence>',
+                'Lst<Lst<in String>>'
         ]
     }
 
-    @PendingFeature(reason = "Breaks because you can't use kotlin elements outside of a compilation execution")
     @Unroll("super type is #superType")
     def 'super type'() {
         given:
@@ -56,7 +59,6 @@ abstract class Test<T> : $superType() {
 
         where:
         superType << [
-//                'AbstractList', raw types not supported
                 'AbstractList<String>',
                 'AbstractList<T>',
                 'AbstractList<Array<T>>',
@@ -67,7 +69,6 @@ abstract class Test<T> : $superType() {
         ]
     }
 
-    @PendingFeature(reason = "Breaks because you can't use kotlin elements outside of a compilation execution")
     @Unroll("super interface is #superType")
     def 'super interface'() {
         given:
@@ -85,21 +86,17 @@ abstract class Test<T> : $superType {
 
         where:
         superType << [
-//                'List',
                 'List<String>',
                 'List<T>',
                 'List<Array<T>>',
                 'List<List<out CharSequence>>',
-//                'List<List<in String>>',
                 'List<List<out Array<T>>>',
                 'List<Array<List<out Array<T>>>>',
-//                'List<List>',
                 'List<List<Object>>',
         ]
     }
 
     @Unroll("type var is #decl")
-    @PendingFeature
     def 'type vars declared on type'() {
         given:
         def element = buildClassElement("example.Test", """
@@ -109,6 +106,9 @@ import java.util.*;
 
 abstract class Test<A, $decl> {
 }
+
+class Lst<in E> {
+}
 """)
 
         expect:
@@ -117,19 +117,20 @@ abstract class Test<A, $decl> {
         where:
         decl << [
                 'T',
-                'out T : CharSequence',
+//                'out T : CharSequence',
                 'T : A',
-//                'T extends List',
-//                'T extends List<?>',
-//                'T extends List<T>',
-//                'T extends List<? extends T>',
-//                'T extends List<? extends A>',
-//                'T extends List<T[]>',
+                'T : List<*>',
+                'T : List<T>',
+                'T : List<out T>',
+                'T : List<out A>',
+                'T : List<Array<T>>',
+                'T : Lst<in A>',
+                'T : Lst<in T>',
+                'T : Lst<in Array<T>>'
         ]
     }
 
     @Unroll('declaration is #decl')
-    @PendingFeature(reason = "Not yet implemented")
     def 'fold type variable to null'() {
         given:
         def classElement = buildClassElement("example.Test", """
@@ -139,6 +140,9 @@ import java.util.*;
 
 class Test<T> {
     lateinit var field : $decl;
+}
+
+class Lst<in E> {
 }
 """)
         def fieldType = classElement.fields[0].type
@@ -158,6 +162,6 @@ class Test<T> {
         'List<T>'           | 'List'
         'Map<Object, T>'    | 'Map'
         'List<out T>'       | 'List'
-//        'List<? super T>'   | 'List'
+        'Lst<in T>'         | 'Lst'
     }
 }

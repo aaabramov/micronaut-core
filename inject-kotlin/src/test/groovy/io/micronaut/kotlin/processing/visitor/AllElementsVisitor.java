@@ -77,6 +77,14 @@ public class AllElementsVisitor implements TypeElementVisitor<Object, Object> {
         visit(element);
     }
 
+    @Override
+    public void visitField(FieldElement element, VisitorContext context) {
+        initializeClassElement(element.getType());
+        initializeClassElement(element.getGenericType());
+        visit(element);
+        element.getAnnotationMetadata();
+    }
+
     private void initialize(TypedElement typedElement) {
         typedElement.getAnnotationMetadata().getAnnotationNames();
         typedElement.getType().getAnnotationMetadata().getAnnotationNames();
@@ -93,14 +101,9 @@ public class AllElementsVisitor implements TypeElementVisitor<Object, Object> {
         }
         visited.add(classElement);
         initialize(classElement);
+        classElement.getDeclaredGenericPlaceholders();
         classElement.getSyntheticBeanProperties();
         classElement.getAllTypeArguments().values().forEach(ta -> ta.values().forEach(ce -> initializeClassElement(ce, visited)));
-    }
-
-    @Override
-    public void visitField(FieldElement element, VisitorContext context) {
-        visit(element);
-        element.getAnnotationMetadata();
     }
 
     private void visit(Element element) {

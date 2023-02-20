@@ -118,8 +118,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
 
         // The instance AnnotationMetadata of each element can change after a modification
         // Set annotation metadata as actual elements so the changes are reflected
-        val propertyAnnotationMetadata: AnnotationMetadata
-        propertyAnnotationMetadata = if (elements.size == 1) {
+        val propertyAnnotationMetadata: AnnotationMetadata = if (elements.size == 1) {
             elements.iterator().next()
         } else {
             AnnotationMetadataHierarchy(
@@ -508,6 +507,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     }
 
     override fun isAbstract() = abstract
+
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): MemberElement {
         return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as MemberElement
     }

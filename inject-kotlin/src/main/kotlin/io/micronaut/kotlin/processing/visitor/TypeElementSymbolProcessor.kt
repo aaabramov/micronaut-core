@@ -225,7 +225,6 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                         throw ProcessingException(classElement, e.message)
                     }
 
-
                     classDeclaration.getAllFunctions()
                         .filter { it.isConstructor() && !it.isInternal() }
                         .forEach {
@@ -233,17 +232,17 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                         }
 
                     visitMembers(classElement)
-                    val innerClassQuery =
-                        ElementQuery.ALL_INNER_CLASSES.onlyStatic().modifiers { it.contains(ElementModifier.PUBLIC) }
-                    val innerClasses = classElement.getEnclosedElements(innerClassQuery)
-                    innerClasses.forEach {
-                        val visitor = loadedVisitor.visitor
-                        val visitorContext = loadedVisitor.visitorContext
-                        if (loadedVisitor.matches(it)) {
-                            visitor.visitClass(it, visitorContext)
-                            visitMembers(it)
-                        }
-                    }
+//                    val innerClassQuery =
+//                        ElementQuery.ALL_INNER_CLASSES.onlyStatic().modifiers { it.contains(ElementModifier.PUBLIC) }
+//                    val innerClasses = classElement.getEnclosedElements(innerClassQuery)
+//                    innerClasses.forEach {
+//                        val visitor = loadedVisitor.visitor
+//                        val visitorContext = loadedVisitor.visitorContext
+//                        if (loadedVisitor.matches(it)) {
+//                            visitor.visitClass(it, visitorContext)
+//                            visitMembers(it)
+//                        }
+//                    }
                 }
             }
             return data

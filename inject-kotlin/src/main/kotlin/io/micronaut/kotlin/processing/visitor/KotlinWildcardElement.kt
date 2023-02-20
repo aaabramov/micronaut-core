@@ -15,6 +15,7 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.symbol.KSTypeArgument
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.inject.ast.ArrayableClassElement
 import io.micronaut.inject.ast.ClassElement
@@ -23,6 +24,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import java.util.function.Function
 
 class KotlinWildcardElement(
+    private val typeArgument: KSTypeArgument,
     private val upperBounds: List<KotlinClassElement?>,
     private val lowerBounds: List<KotlinClassElement?>,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
@@ -36,6 +38,10 @@ class KotlinWildcardElement(
     arrayDimensions,
     false
 ), WildcardElement {
+
+    override fun getGenericNativeType(): Any {
+        return typeArgument
+    }
 
     override fun foldBoundGenericTypes(@NonNull fold: Function<ClassElement?, ClassElement>): ClassElement? {
         val upperBounds: List<KotlinClassElement?> = this.upperBounds
@@ -52,7 +58,7 @@ class KotlinWildcardElement(
             }.toList()
         return fold.apply(
             if (upperBounds.contains(null) || lowerBounds.contains(null)) null else KotlinWildcardElement(
-                upperBounds, lowerBounds, elementAnnotationMetadataFactory, visitorContext, arrayDimensions
+                typeArgument, upperBounds, lowerBounds, elementAnnotationMetadataFactory, visitorContext, arrayDimensions
             )
         )
     }
@@ -69,9 +75,11 @@ class KotlinWildcardElement(
         return list
     }
 
-    private fun toKotlinClassElement(element: ClassElement?): KotlinClassElement {
-        return if (element == null || element is KotlinClassElement) {
-            element as KotlinClassElement
+    private fun toKotlinClassElement(element: ClassElement?): KotlinClassElement? {
+        return if (element == null) {
+            return null
+        } else if (element is KotlinClassElement) {
+            return element
         } else {
             if (element.isWildcard || element.isGenericPlaceholder) {
                 throw UnsupportedOperationException("Cannot convert wildcard / free type variable to JavaClassElement")
@@ -83,7 +91,7 @@ class KotlinWildcardElement(
                         )
                     } as ArrayableClassElement)
                     .withArrayDimensions(element.arrayDimensions)
-                    .withBoundGenericTypes(element.boundGenericTypes) as KotlinClassElement
+                    .withTypeArguments(element.typeArguments) as KotlinClassElement
             }
         }
     }

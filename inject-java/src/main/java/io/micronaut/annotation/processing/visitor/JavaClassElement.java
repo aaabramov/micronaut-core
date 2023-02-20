@@ -785,34 +785,34 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         }
 
         @Override
-        protected io.micronaut.inject.ast.Element toAstElement(Element enclosedElement, Class<?> elementType) {
+        protected io.micronaut.inject.ast.Element toAstElement(Element nativeType, Class<?> elementType) {
             final JavaElementFactory elementFactory = visitorContext.getElementFactory();
-            return switch (enclosedElement.getKind()) {
+            return switch (nativeType.getKind()) {
                 case METHOD -> elementFactory.newMethodElement(
                     JavaClassElement.this,
-                    (ExecutableElement) enclosedElement,
+                    (ExecutableElement) nativeType,
                     elementAnnotationMetadataFactory
                 );
                 case FIELD -> elementFactory.newFieldElement(
                     JavaClassElement.this,
-                    (VariableElement) enclosedElement,
+                    (VariableElement) nativeType,
                     elementAnnotationMetadataFactory
                 );
                 case ENUM_CONSTANT -> elementFactory.newEnumConstantElement(
                     JavaClassElement.this,
-                    (VariableElement) enclosedElement,
+                    (VariableElement) nativeType,
                     elementAnnotationMetadataFactory
                 );
                 case CONSTRUCTOR -> elementFactory.newConstructorElement(
                     JavaClassElement.this,
-                    (ExecutableElement) enclosedElement,
+                    (ExecutableElement) nativeType,
                     elementAnnotationMetadataFactory
                 );
                 case CLASS, ENUM -> elementFactory.newClassElement(
-                    (TypeElement) enclosedElement,
+                    (TypeElement) nativeType,
                     elementAnnotationMetadataFactory
                 );
-                default -> throw new IllegalStateException("Unknown element: " + enclosedElement);
+                default -> throw new IllegalStateException("Unknown element: " + nativeType);
             };
         }
 

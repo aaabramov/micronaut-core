@@ -32,7 +32,7 @@ class KotlinParameterElement(
     private val internalName : String by lazy {
         parameter.name!!.asString()
     }
-    private val internalReturnType: ClassElement by lazy {
+    private val internalGenericType: ClassElement by lazy {
         when (val t = type) {
             is KotlinClassElement -> {
                 newClassElement(t.kotlinType, methodElement.declaringType.typeArguments)
@@ -76,7 +76,7 @@ class KotlinParameterElement(
     override fun getType(): ClassElement = parameterType
 
     override fun getGenericType(): ClassElement {
-        return internalReturnType
+        return internalGenericType
     }
 
     override fun getArrayDimensions(): Int = parameterType.arrayDimensions
