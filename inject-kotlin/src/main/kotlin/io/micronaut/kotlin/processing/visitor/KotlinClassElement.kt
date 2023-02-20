@@ -75,6 +75,9 @@ open class KotlinClassElement(val kotlinType: KSType,
             resolveTypeParameter(it, emptyMap()) as GenericPlaceholderElement
         }.toMutableList()
     }
+    private val internalFields : List<FieldElement> by lazy {
+        super.getFields()
+    }
     private val enclosedElementsQuery = KotlinEnclosedElementsQuery()
     private val nativeProperties  : List<PropertyElement> by lazy {
         classDeclaration.getAllProperties()
@@ -213,6 +216,10 @@ open class KotlinClassElement(val kotlinType: KSType,
 
     override fun getDeclaredGenericPlaceholders(): List<GenericPlaceholderElement> {
         return internalDeclaredGenericPlaceholders
+    }
+
+    override fun getFields(): List<FieldElement> {
+        return internalFields
     }
 
 //    override fun withBoundGenericTypes(typeArguments: MutableList<out ClassElement>?): ClassElement {
@@ -510,10 +517,33 @@ open class KotlinClassElement(val kotlinType: KSType,
         )
     }
 
-    override fun withTypeArguments(typeArguments: MutableMap<String, ClassElement>?): ClassElement {
+    override fun withTypeArguments(typeArguments: Map<String, ClassElement>): ClassElement {
         return KotlinClassElement(
             kotlinType, classDeclaration, annotationInfo, elementAnnotationMetadataFactory, typeArguments, visitorContext, arrayDimensions, typeVariable
         )
+    }
+
+    @NonNull
+    override fun withTypeArguments(@NonNull typeArguments: Collection<ClassElement>): ClassElement? {
+        if (getTypeArguments() == typeArguments) {
+            return this
+        }
+        if (typeArguments.isEmpty()) {
+            return withTypeArguments(emptyMap())
+        }
+        val boundByName: MutableMap<String, ClassElement> = LinkedHashMap()
+        val keys = getTypeArguments().keys
+        val variableNames: Iterator<String> = keys.iterator()
+        val args = typeArguments.iterator()
+        while (variableNames.hasNext() && args.hasNext()) {
+            var next = args.next()
+            val nativeType = next.nativeType
+            if (nativeType is Class<*>) {
+                next = visitorContext.getClassElement(nativeType).orElse(next)
+            }
+            boundByName[variableNames.next()] = next
+        }
+        return withTypeArguments(boundByName)
     }
 
     override fun isAbstract(): Boolean {

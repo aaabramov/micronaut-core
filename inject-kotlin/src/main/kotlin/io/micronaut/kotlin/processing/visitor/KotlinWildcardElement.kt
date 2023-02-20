@@ -29,6 +29,7 @@ class KotlinWildcardElement(
     private val lowerBounds: List<KotlinClassElement?>,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,
+    private val isRawType: Boolean,
     arrayDimensions: Int = 0
 ) : KotlinClassElement(
     upperBounds[0]!!.nativeType,
@@ -38,6 +39,10 @@ class KotlinWildcardElement(
     arrayDimensions,
     false
 ), WildcardElement {
+
+    override fun isRawType(): Boolean {
+        return isRawType;
+    }
 
     override fun getGenericNativeType(): Any {
         return typeArgument
@@ -58,7 +63,7 @@ class KotlinWildcardElement(
             }.toList()
         return fold.apply(
             if (upperBounds.contains(null) || lowerBounds.contains(null)) null else KotlinWildcardElement(
-                typeArgument, upperBounds, lowerBounds, elementAnnotationMetadataFactory, visitorContext, arrayDimensions
+                typeArgument, upperBounds, lowerBounds, elementAnnotationMetadataFactory, visitorContext, isRawType, arrayDimensions
             )
         )
     }

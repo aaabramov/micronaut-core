@@ -326,7 +326,8 @@ abstract class AbstractKotlinElement<T : KSNode>(
                 resolveUpperBounds(typeArgument, parentTypeArguments, visitedTypes),
                 resolveLowerBounds(typeArgument, parentTypeArguments, visitedTypes),
                 annotationMetadataFactory,
-                visitorContext
+                visitorContext,
+                typeArgument.variance == Variance.STAR
             )
             // other cases
             else -> newKotlinClassElement(typeArgument.type!!.resolve(), parentTypeArguments, visitedTypes)

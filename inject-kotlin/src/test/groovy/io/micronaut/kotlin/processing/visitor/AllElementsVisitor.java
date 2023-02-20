@@ -46,64 +46,73 @@ public class AllElementsVisitor implements TypeElementVisitor<Object, Object> {
     public void visitClass(ClassElement element, VisitorContext context) {
         visit(element);
         // Preload annotations and elements for tests otherwise it fails because the compiler is done
-        element.getBeanProperties().forEach(this::initialize);
-        element.getAnnotationMetadata();
-        element.getSuperType().ifPresent(superType -> {
-            superType.getAllTypeArguments();
-            superType.getTypeArguments();
-        });
-        initializeClassElement(element);
+        initializeClassElement(element, new HashSet<>());
         VISITED_CLASS_ELEMENTS.add(element);
     }
 
     @Override
-    public void visitMethod(MethodElement element, VisitorContext context) {
-        VISITED_METHOD_ELEMENTS.add(element);
+    public void visitMethod(MethodElement methodElement, VisitorContext context) {
+        VISITED_METHOD_ELEMENTS.add(methodElement);
         // Preload
-        element.getReturnType().getBeanProperties().forEach(AnnotationMetadataProvider::getAnnotationMetadata);
-        Arrays.stream(element.getParameters()).flatMap(p -> p.getType().getBeanProperties().stream()).forEach(propertyElement -> {
-            initialize(propertyElement);
-            propertyElement.getField().ifPresent(this::initialize);
-            propertyElement.getWriteMethod().ifPresent(methodElement -> {
-                initializeClassElement(methodElement.getReturnType());
-                Arrays.stream(methodElement.getParameters()).forEach(this::initialize);
-            });
-            propertyElement.getReadMethod().ifPresent(methodElement -> {
-                initializeClassElement(methodElement.getReturnType());
-                Arrays.stream(methodElement.getParameters()).forEach(this::initialize);
-            });
-        });
-        element.getAnnotationMetadata();
-        visit(element);
+        initializeMethodElement(methodElement, new HashSet<>());
+        visit(methodElement);
     }
 
     @Override
     public void visitField(FieldElement element, VisitorContext context) {
-        initializeClassElement(element.getType());
-        initializeClassElement(element.getGenericType());
+        initializeTypedElement(element, new HashSet<>());
         visit(element);
-        element.getAnnotationMetadata();
     }
 
-    private void initialize(TypedElement typedElement) {
+    private void initializeElement(Element typedElement) {
         typedElement.getAnnotationMetadata().getAnnotationNames();
-        typedElement.getType().getAnnotationMetadata().getAnnotationNames();
-        typedElement.getGenericType().getAnnotationMetadata().getAnnotationNames();
     }
 
-    private void initializeClassElement(ClassElement classElement) {
-        initializeClassElement(classElement, new HashSet<>());
-    }
-
-    private void initializeClassElement(ClassElement classElement, Set<ClassElement> visited) {
-        if (visited.contains(classElement)) {
+    private void initializeTypedElement(TypedElement typedElement, Set<Element> visited) {
+        if (visited.contains(typedElement)) {
             return;
         }
+        visited.add(typedElement);
+        initializeTypedElementNoCache(typedElement, visited);
+    }
+
+    private void initializeTypedElementNoCache(TypedElement typedElement, Set<Element> visited) {
+        initializeElement(typedElement);
+        initializeClassElement(typedElement.getType(), visited);
+        initializeClassElement(typedElement.getGenericType(), visited);
+    }
+
+    private void initializeClassElement(ClassElement classElement, Set<Element> visitedParam) {
+        if (classElement.isPrimitive() || classElement.getName().startsWith("java.") || classElement.getName().startsWith("kotlin.")) {
+            return;
+        }
+        if (visitedParam.contains(classElement)) {
+            return;
+        }
+        Set<Element> visited = new HashSet<>();
         visited.add(classElement);
-        initialize(classElement);
+        initializeTypedElementNoCache(classElement, visited);
+        classElement.getSuperType().ifPresent(superType -> initializeClassElement(superType, visited));
+        classElement.getFields().forEach(field -> initializeTypedElement(field, visited));
         classElement.getDeclaredGenericPlaceholders();
         classElement.getSyntheticBeanProperties();
+        classElement.getBeanProperties().forEach(AnnotationMetadataProvider::getAnnotationMetadata);
+        classElement.getBeanProperties().forEach(propertyElement -> {
+            initializeTypedElement(propertyElement, visited);
+            propertyElement.getField().ifPresent(f -> initializeTypedElement(f, visited));
+            propertyElement.getWriteMethod().ifPresent(methodElement -> initializeMethodElement(methodElement, visited));
+            propertyElement.getReadMethod().ifPresent(methodElement -> initializeMethodElement(methodElement, visited));
+        });
         classElement.getAllTypeArguments().values().forEach(ta -> ta.values().forEach(ce -> initializeClassElement(ce, visited)));
+    }
+
+    private void initializeMethodElement(MethodElement methodElement, Set<Element> visited) {
+        initializeElement(methodElement);
+        initializeClassElement(methodElement.getReturnType(), visited);
+        initializeClassElement(methodElement.getGenericReturnType(), visited);
+        Arrays.stream(methodElement.getParameters()).forEach(p -> initializeTypedElement(p, visited));
+        methodElement.getDeclaredTypeArguments().values().forEach(c -> initializeClassElement(c, visited));
+        methodElement.getTypeArguments().values().forEach(c -> initializeClassElement(c, visited));
     }
 
     private void visit(Element element) {
