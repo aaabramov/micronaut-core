@@ -13,8 +13,8 @@ class KotlinReconstructionSpec extends AbstractKotlinCompilerSpec {
     @Unroll("field type is #fieldType")
     def 'field type'() {
         given:
-            def element = buildClassElement("example.Test", """
-package example;
+            def element = buildClassElement("test.Test", """
+package test;
 
 import java.util.*;
 
@@ -50,8 +50,8 @@ class Lst<in E> {
     @Unroll("type var is #decl")
     def 'type vars declared on method'() {
         given:
-            def element = buildClassElement("example.Test", """
-package example;
+            def element = buildClassElement("test.Test", """
+package test;
 
 import java.util.*;
 
@@ -85,8 +85,8 @@ class Lst<in E> {
     @Unroll("super type is #superType")
     def 'super type'() {
         given:
-            def element = buildClassElement("example.Test", """
-package example;
+            def element = buildClassElement("test.Test", """
+package test;
 
 import java.util.*;
 
@@ -112,8 +112,8 @@ abstract class Test<T> : $superType() {
     @Unroll("super interface is #superType")
     def 'super interface'() {
         given:
-            def element = buildClassElement("example.Test", """
-package example;
+            def element = buildClassElement("test.Test", """
+package test;
 
 import java.util.*;
 
@@ -139,8 +139,8 @@ abstract class Test<T> : $superType {
     @Unroll("type var is #decl")
     def 'type vars declared on type'() {
         given:
-            def element = buildClassElement("example.Test", """
-package example;
+            def element = buildClassElement("test.Test", """
+package test;
 
 import java.util.*;
 
@@ -172,8 +172,8 @@ class Lst<in E> {
     @Unroll('declaration is #decl')
     def 'fold type variable to null'() {
         given:
-            def classElement = buildClassElement("example.Test", """
-package example;
+            def classElement = buildClassElement("test.Test", """
+package test;
 
 import java.util.*;
 
@@ -207,8 +207,8 @@ class Lst<in E> {
     @Unroll("field type is #fieldType")
     def 'bound field type'() {
         given:
-            def element = buildClassElement("example.Wrapper", """
-package example;
+            def element = buildClassElement("test.Wrapper", """
+package test;
 
 import java.util.*;
 
@@ -244,8 +244,8 @@ class Lst<in E> {
     @Unroll("field type is #fieldType")
     def 'bound field type to other variable'() {
         given:
-            def element = buildClassElement("example.Wrapper", """
-package example;
+            def element = buildClassElement("test.Wrapper", """
+package test;
 
 import java.util.*;
 
@@ -279,8 +279,8 @@ class Lst<in E> {
 
     def 'unbound super type'() {
         given:
-            def superElement = buildClassElement("example.Sub", """
-package example;
+            def superElement = buildClassElement("test.Sub", """
+package test;
 
 import java.util.*;
 
@@ -291,8 +291,8 @@ open class Sup<$decl> {
 class Lst<in E> {
 }
 """)
-            def interfaceElement = buildClassElement("example.Sub", """
-package example;
+            def interfaceElement = buildClassElement("test.Sub", """
+package test;
 
 import java.util.*;
 
@@ -318,8 +318,8 @@ class Lst<in E> {
 
     def 'bound super type'() {
         given:
-            def superElement = buildClassElementTransformed("example.Sub", """
-package example;
+            def superElement = buildClassElementTransformed("test.Sub", """
+package test;
 
 import java.util.*;
 
@@ -334,8 +334,8 @@ class Lst<in E> {
                 ce.getSuperType().ifPresent {st -> st.getAllTypeArguments()}
                 return ce
             })
-            def interfaceElement = buildClassElementTransformed("example.Sub", """
-package example;
+            def interfaceElement = buildClassElementTransformed("test.Sub", """
+package test;
 
 import java.util.*;
 
@@ -366,8 +366,8 @@ class Lst<in E> {
     @Unroll('declaration is #decl')
     def 'fold type variable'() {
         given:
-            def fieldType = buildClassElementTransformed("example.Test", """
-package example;
+            def fieldType = buildClassElementTransformed("test.Test", """
+package test;
 
 import java.util.*;
 
@@ -403,8 +403,8 @@ class Lst<in E> {
 
     def 'distinguish list types'() {
         given:
-            def classElement = buildClassElement("example.Test", """
-package example;
+            def classElement = buildClassElement("test.Test", """
+package test;
 
 import java.util.*;
 
@@ -441,8 +441,8 @@ class Test {
 
     def 'distinguish list types 2'() {
         given:
-            def classElement = buildClassElement("example.Test", """
-package example;
+            def classElement = buildClassElement("test.Test", """
+package test;
 
 import java.util.*;
 import java.lang.Number;
@@ -490,8 +490,8 @@ class Test {
 
     def 'distinguish base list type'() {
         given:
-            def classElement = buildClassElement("example.Test", """
-package example;
+            def classElement = buildClassElement("test.Test", """
+package test;
 
 import java.util.*;
 import java.lang.Number;
@@ -537,8 +537,8 @@ abstract class Base<T> {
 
     def 'distinguish base list generic type'() {
         given:
-            def classElement = buildClassElement("example.Test", """
-package example;
+            def classElement = buildClassElement("test.Test", """
+package test;
 
 import java.util.*;
 import java.lang.Number;

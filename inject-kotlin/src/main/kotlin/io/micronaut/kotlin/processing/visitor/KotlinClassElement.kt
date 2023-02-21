@@ -137,6 +137,7 @@ open class KotlinClassElement(
     private val internalName: String by lazy {
         classDeclaration.getBinaryName(visitorContext.resolver, visitorContext)
     }
+
     private val resolvedInterfaces: Collection<ClassElement> by lazy {
         classDeclaration.superTypes.map { it.resolve() }
             .filter {
@@ -163,6 +164,38 @@ open class KotlinClassElement(
             .map {
                 newClassElement(it.resolve(), typeArguments)
             }
+    }
+    private val resolvedPrimaryConstructor: Optional<MethodElement> by lazy {
+        val primaryConstructor = super.getPrimaryConstructor()
+        if (primaryConstructor.isPresent) {
+            primaryConstructor
+        } else {
+            Optional.ofNullable(classDeclaration.primaryConstructor)
+                .filter { !it.isPrivate() }
+                .map {
+                    visitorContext.elementFactory.newConstructorElement(
+                        this,
+                        it,
+                        elementAnnotationMetadataFactory
+                    )
+                }
+        }
+    }
+    private val resolvedDefaultConstructor: Optional<MethodElement> by lazy {
+        val defaultConstructor = super.getDefaultConstructor()
+        if (defaultConstructor.isPresent) {
+            defaultConstructor
+        } else {
+            Optional.ofNullable(classDeclaration.primaryConstructor)
+                .filter { !it.isPrivate() && it.parameters.isEmpty() }
+                .map {
+                    visitorContext.elementFactory.newConstructorElement(
+                        this,
+                        it,
+                        elementAnnotationMetadataFactory
+                    )
+                }
+        }
     }
 
     private val nt: KSAnnotated =
@@ -599,43 +632,13 @@ open class KotlinClassElement(
 
     override fun isInner() = outerType != null
 
-    override fun getPrimaryConstructor(): Optional<MethodElement> {
-        val primaryConstructor = super.getPrimaryConstructor()
-        return if (primaryConstructor.isPresent) {
-            primaryConstructor
-        } else {
-            Optional.ofNullable(classDeclaration.primaryConstructor)
-                .filter { !it.isPrivate() }
-                .map {
-                    visitorContext.elementFactory.newConstructorElement(
-                        this,
-                        it,
-                        elementAnnotationMetadataFactory
-                    )
-                }
-        }
-    }
+    override fun getPrimaryConstructor() = resolvedPrimaryConstructor
 
-    override fun getDefaultConstructor(): Optional<MethodElement> {
-        val defaultConstructor = super.getDefaultConstructor()
-        return if (defaultConstructor.isPresent) {
-            defaultConstructor
-        } else {
-            Optional.ofNullable(classDeclaration.primaryConstructor)
-                .filter { !it.isPrivate() && it.parameters.isEmpty() }
-                .map {
-                    visitorContext.elementFactory.newConstructorElement(
-                        this,
-                        it,
-                        elementAnnotationMetadataFactory
-                    )
-                }
-        }
-    }
+    override fun getDefaultConstructor() = resolvedDefaultConstructor
 
     override fun getTypeArguments(): Map<String, ClassElement> {
         if (resolvedTypeArguments == null) {
-            resolvedTypeArguments = resolveTypeArguments(classDeclaration, emptyMap())
+            resolvedTypeArguments = resolveTypeArguments(kotlinType, emptyMap())
 //            val typeArguments = mutableMapOf<String, ClassElement>()
 //            val elementFactory = visitorContext.elementFactory
 //            val typeParameters = kotlinType.declaration.typeParameters

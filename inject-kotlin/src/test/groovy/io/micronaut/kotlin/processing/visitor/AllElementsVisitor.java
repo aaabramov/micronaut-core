@@ -68,7 +68,7 @@ public class AllElementsVisitor implements TypeElementVisitor<Object, Object> {
         typedElement.getAnnotationMetadata().getAnnotationNames();
     }
 
-    private void initializeTypedElement(TypedElement typedElement, Set<Element> visited) {
+    private void initializeTypedElement(TypedElement typedElement, Set<Object> visited) {
         if (visited.contains(typedElement)) {
             return;
         }
@@ -76,22 +76,24 @@ public class AllElementsVisitor implements TypeElementVisitor<Object, Object> {
         initializeTypedElementNoCache(typedElement, visited);
     }
 
-    private void initializeTypedElementNoCache(TypedElement typedElement, Set<Element> visited) {
+    private void initializeTypedElementNoCache(TypedElement typedElement, Set<Object> visited) {
         initializeElement(typedElement);
         initializeClassElement(typedElement.getType(), visited);
         initializeClassElement(typedElement.getGenericType(), visited);
     }
 
-    private void initializeClassElement(ClassElement classElement, Set<Element> visitedParam) {
-        if (classElement.isPrimitive() || classElement.getName().startsWith("java.") || classElement.getName().startsWith("kotlin.")) {
+    private void initializeClassElement(ClassElement classElement, Set<Object> visitedParam) {
+        if (!classElement.getName().startsWith("test.")) {
             return;
         }
         if (visitedParam.contains(classElement)) {
             return;
         }
-        Set<Element> visited = new HashSet<>();
+        Set<Object> visited = new HashSet<>(visitedParam);
         visited.add(classElement);
+
         initializeTypedElementNoCache(classElement, visited);
+        classElement.getPrimaryConstructor().ifPresent(methodElement -> initializeMethodElement(methodElement, visitedParam));
         classElement.getSuperType().ifPresent(superType -> initializeClassElement(superType, visited));
         classElement.getFields().forEach(field -> initializeTypedElement(field, visited));
         classElement.getMethods().forEach(method -> initializeMethodElement(method, visited));
@@ -107,7 +109,13 @@ public class AllElementsVisitor implements TypeElementVisitor<Object, Object> {
         classElement.getAllTypeArguments().values().forEach(ta -> ta.values().forEach(ce -> initializeClassElement(ce, visited)));
     }
 
-    private void initializeMethodElement(MethodElement methodElement, Set<Element> visited) {
+    private void initializeMethodElement(MethodElement methodElement, Set<Object> visitedParam) {
+        if (visitedParam.contains(methodElement)) {
+            return;
+        }
+        Set<Object> visited = new HashSet<>(visitedParam);
+        visited.add(methodElement);
+
         initializeElement(methodElement);
         initializeClassElement(methodElement.getReturnType(), visited);
         initializeClassElement(methodElement.getGenericReturnType(), visited);

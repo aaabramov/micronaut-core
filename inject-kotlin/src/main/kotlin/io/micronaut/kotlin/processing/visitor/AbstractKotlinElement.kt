@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.ElementModifier
+import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.ElementMutableAnnotationMetadataDelegate
@@ -217,6 +218,11 @@ abstract class AbstractKotlinElement<T : KSNode>(
         parentTypeArguments: Map<String, ClassElement>
     ) = resolveTypeArguments(type, parentTypeArguments, HashSet())
 
+    protected fun resolveTypeArguments(
+        type: KSType,
+        parentTypeArguments: Map<String, ClassElement>
+    ) = resolveTypeArguments(type, parentTypeArguments, HashSet())
+
     private fun resolveTypeArguments(
         type: KSDeclaration,
         parentTypeArguments: Map<String, ClassElement>,
@@ -299,28 +305,42 @@ abstract class AbstractKotlinElement<T : KSNode>(
         parentTypeArguments: Map<String, ClassElement>,
         visitedTypes: MutableSet<Any>
     ): ClassElement {
+
         return when (typeArgument.variance) {
-            Variance.STAR, Variance.COVARIANT, Variance.CONTRAVARIANT -> KotlinWildcardElement( // example List<*>
-                typeArgument,
-                resolveUpperBounds(typeArgument, parentTypeArguments, visitedTypes),
-                resolveLowerBounds(typeArgument, parentTypeArguments, visitedTypes),
-                annotationMetadataFactory,
-                visitorContext,
-                typeArgument.variance == Variance.STAR
-            )
-            // other cases
-            else -> newKotlinClassElement(typeArgument.type!!.resolve(), parentTypeArguments, visitedTypes)
+            Variance.STAR, Variance.COVARIANT, Variance.CONTRAVARIANT -> {
+                // example List<*>, IN, OUT
+                val type = typeArgument.type!!
+                val stripTypeArguments = !visitedTypes.add(type)
+                val upperBounds =
+                    resolveUpperBounds(typeArgument, parentTypeArguments, visitedTypes, stripTypeArguments)
+                val lowerBounds = resolveLowerBounds(typeArgument, parentTypeArguments, visitedTypes)
+                val upper = WildcardElement.findUpperType(upperBounds, lowerBounds)!!
+                KotlinWildcardElement(
+                    typeArgument,
+                    upper,
+                    upperBounds,
+                    lowerBounds,
+                    annotationMetadataFactory,
+                    visitorContext,
+                    typeArgument.variance == Variance.STAR
+                )
+            }
+
+            // List<String>
+            else -> {
+                newKotlinClassElement(typeArgument, parentTypeArguments, visitedTypes)
+            }
         }
     }
 
     private fun resolveLowerBounds(
         typeArgument: KSTypeArgument,
         parentTypeArguments: Map<String, ClassElement>,
-        visitedTypes: MutableSet<Any>
+        visitedTypes: MutableSet<Any>,
     ): List<KotlinClassElement?> {
         return if (typeArgument.variance == Variance.CONTRAVARIANT) {
             listOf(
-                newKotlinClassElement(typeArgument.type?.resolve()!!, parentTypeArguments, visitedTypes)
+                newKotlinClassElement(typeArgument, parentTypeArguments, visitedTypes)
             )
         } else {
             return emptyList()
@@ -328,19 +348,23 @@ abstract class AbstractKotlinElement<T : KSNode>(
     }
 
     private fun resolveUpperBounds(
-        arg: KSTypeArgument,
+        typeArgument: KSTypeArgument,
         parentTypeArguments: Map<String, ClassElement>,
-        visitedTypes: MutableSet<Any>
+        visitedTypes: MutableSet<Any>,
+        stripTypeArguments: Boolean
     ): List<KotlinClassElement?> {
-        return if (arg.variance == Variance.COVARIANT) {
-            listOf(
-                newKotlinClassElement(arg.type?.resolve()!!, parentTypeArguments, visitedTypes)
-            )
-        } else {
-            val objectType = visitorContext.resolver.getClassDeclarationByName(Object::class.java.name)!!
-            listOf(
-                newKotlinClassElement(objectType.asStarProjectedType(), parentTypeArguments, visitedTypes)
-            )
+        return when (typeArgument.variance) {
+            Variance.COVARIANT, Variance.STAR -> {
+                listOf(
+                    newKotlinClassElement(typeArgument, parentTypeArguments, visitedTypes, stripTypeArguments)
+                )
+            }
+            else -> {
+                val objectType = visitorContext.resolver.getClassDeclarationByName(Object::class.java.name)!!
+                listOf(
+                    newKotlinClassElement(objectType.asStarProjectedType(), parentTypeArguments, visitedTypes)
+                )
+            }
         }
     }
 
@@ -366,6 +390,18 @@ abstract class AbstractKotlinElement<T : KSNode>(
         visitedTypes: MutableSet<Any>,
         stripTypeArguments: Boolean = false,
     ) = newClassElement(type, parentTypeArguments, visitedTypes, false, stripTypeArguments) as KotlinClassElement
+
+    private fun newKotlinClassElement(
+        typeArgument: KSTypeArgument,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>,
+        stripTypeArguments: Boolean = false,
+        ): KotlinClassElement {
+        val type = typeArgument.type
+        val resolvedType = type!!.resolve()
+        val stripTypeArguments2 = stripTypeArguments || !visitedTypes.add(type)
+        return newClassElement(resolvedType, parentTypeArguments, visitedTypes, false, stripTypeArguments2) as KotlinClassElement
+    }
 
     protected fun newClassElement(
         type: KSType,
@@ -523,8 +559,13 @@ abstract class AbstractKotlinElement<T : KSNode>(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is AbstractKotlinElement<*>) return false
+        if (isAnyOrObject() && other.isAnyOrObject()) return true
         if (nativeType != other.nativeType) return false
         return true
+    }
+
+    private fun isAnyOrObject(): Boolean  {
+        return name.equals(Object::class.java.name) || name.equals(Any::class.java.name)
     }
 
     override fun hashCode(): Int {

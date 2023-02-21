@@ -18,15 +18,20 @@ package io.micronaut.kotlin.processing.visitor
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.reflect.ReflectionUtils.findMethod
 
-open class KSAnnotatedReference(open val nativeType: Any, val node: KSNode) {
+open class KSAnnotatedReference(private val nativeType: Any, val node: KSNode) {
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is KSAnnotatedReference) return false
-
-        if (nativeType != other.nativeType) return false
-
+        if (findNativeType() != other.findNativeType()) return false
         return true
+    }
+
+    fun findNativeType() : Any {
+        if (nativeType is KSAnnotatedReference) {
+            return nativeType.findNativeType()
+        }
+        return nativeType
     }
 
     override fun hashCode(): Int {

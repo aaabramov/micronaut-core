@@ -450,29 +450,28 @@ class Test {
 //            method.getReturnType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
 //            method.getGenericReturnType().getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
 //    }
-//
-//    void "test recursive generic type parameter"() {
-//        given:
-//            ClassElement ce = buildClassElement('''\
-//package test;
-//
-//final class TrackedSortedSet<T extends java.lang.Comparable<? super T>> {
-//}
-//
-//''')
-//        expect:
-//            def typeArguments = ce.getTypeArguments()
-//            typeArguments.size() == 1
-//            def typeArgument = typeArguments.get("T")
-//            typeArgument.name == "java.lang.Comparable"
-//            def nextTypeArguments = typeArgument.getTypeArguments()
-//            def nextTypeArgument = nextTypeArguments.get("T")
-//            nextTypeArgument.name == "java.lang.Comparable"
-//            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-//            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-//            nextNextTypeArgument.name == "java.lang.Object"
-//    }
-//
+
+    void "test recursive generic type parameter"() {
+        given:
+            ClassElement ce = buildClassElement('test.TrackedSortedSet', '''\
+package test;
+
+class TrackedSortedSet<T : Comparable<T>>
+
+''')
+        expect:
+            def typeArguments = ce.getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "java.lang.Comparable"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "java.lang.Comparable"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
+    }
+
 //    void "test annotation metadata present on deep type parameters for method 2"() {
 //        ClassElement ce = buildClassElement('''
 //package test;
@@ -505,346 +504,245 @@ class Test {
 //            def level3 = level2.getTypeArguments()["E"]
 //            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
 //    }
-//
-//    void "test annotations on recursive generic type parameter 1"() {
-//        given:
-//            ClassElement ce = buildClassElement('''\
-//package test;
-//
-//final class TrackedSortedSet<@io.micronaut.visitors.TypeUseRuntimeAnn T extends java.lang.Comparable<? super T>> {
-//}
-//
-//''')
-//        expect:
-//            def typeArguments = ce.getTypeArguments()
-//            typeArguments.size() == 1
-//            def typeArgument = typeArguments.get("T")
-//            typeArgument.name == "java.lang.Comparable"
-//            typeArgument.getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn']
-//    }
-//
-//    void "test recursive generic type parameter 2"() {
-//        given:
-//            ClassElement ce = buildClassElement('''\
-//package test;
-//
-//final class Test<T extends Test> { // Missing argument
-//}
-//
-//''')
-//        expect:
-//            def typeArguments = ce.getTypeArguments()
-//            typeArguments.size() == 1
-//            def typeArgument = typeArguments.get("T")
-//            typeArgument.name == "test.Test"
-//            def nextTypeArguments = typeArgument.getTypeArguments()
-//            def nextTypeArgument = nextTypeArguments.get("T")
-//            nextTypeArgument.name == "java.lang.Object"
-//    }
-//
-//    void "test recursive generic type parameter 3"() {
-//        given:
-//            ClassElement ce = buildClassElement('''\
-//package test;
-//
-//final class Test<T extends Test<T>> {
-//}
-//
-//''')
-//        expect:
-//            def typeArguments = ce.getTypeArguments()
-//            typeArguments.size() == 1
-//            def typeArgument = typeArguments.get("T")
-//            typeArgument.name == "test.Test"
-//            def nextTypeArguments = typeArgument.getTypeArguments()
-//            def nextTypeArgument = nextTypeArguments.get("T")
-//            nextTypeArgument.name == "java.lang.Object"
-//    }
-//
-//    void "test recursive generic type parameter 4"() {
-//        given:
-//            ClassElement ce = buildClassElement('''\
-//package test;
-//
-//final class Test<T extends Test<?>> {
-//}
-//
-//''')
-//        expect:
-//            def typeArguments = ce.getTypeArguments()
-//            typeArguments.size() == 1
-//            def typeArgument = typeArguments.get("T")
-//            typeArgument.name == "test.Test"
-//            def nextTypeArguments = typeArgument.getTypeArguments()
-//            def nextTypeArgument = nextTypeArguments.get("T")
-//            nextTypeArgument.name == "java.lang.Object"
-//    }
-//
-//    void "test recursive generic method return"() {
-//        given:
-//            ClassElement ce = buildClassElement('''\
-//package test;
-//
-//import org.hibernate.SessionFactory;
-//import org.hibernate.engine.spi.SessionFactoryDelegatingImpl;
-//
-//class MyFactory {
-//
-//    SessionFactory sessionFactory() {
-//        return new SessionFactoryDelegatingImpl(null);
-//    }
-//}
-//
-//''')
-//        expect:
-//            def sessionFactoryMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("sessionFactory")).get()
-//            def withOptionsMethod = sessionFactoryMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("withOptions")).get()
-//            def typeArguments = withOptionsMethod.getReturnType().getTypeArguments()
-//            typeArguments.size() == 1
-//            def typeArgument = typeArguments.get("T")
-//            typeArgument.name == "org.hibernate.SessionBuilder"
-//            def nextTypeArguments = typeArgument.getTypeArguments()
-//            def nextTypeArgument = nextTypeArguments.get("T")
-//            nextTypeArgument.name == "java.lang.Object"
-//    }
-//
-//    void "test recursive generic method return 2"() {
-//        given:
-//            ClassElement ce = buildClassElement('''\
-//package test;
-//
-//class MyFactory {
-//
-//    MyBean myBean() {
-//        return new MyBean();
-//    }
-//}
-//
-//interface MyBuilder<T extends MyBuilder> {
-//    T build();
-//}
-//
-//class MyBean {
-//
-//   MyBuilder<test.MyBuilder> myBuilder() {
-//       return null;
-//   }
-//
-//}
-//
-//''')
-//        expect:
-//            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
-//            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
-//            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-//            typeArguments.size() == 1
-//            def typeArgument = typeArguments.get("T")
-//            typeArgument.name == "test.MyBuilder"
-//            def nextTypeArguments = typeArgument.getTypeArguments()
-//            def nextTypeArgument = nextTypeArguments.get("T")
-//            nextTypeArgument.name == "test.MyBuilder"
-//            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-//            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-//            nextNextTypeArgument.name == "java.lang.Object"
-//    }
-//
-//    void "test recursive generic method return 3"() {
-//        given:
-//            ClassElement ce = buildClassElement('''\
-//package test;
-//
-//class MyFactory {
-//
-//    MyBean myBean() {
-//        return new MyBean();
-//    }
-//}
-//
-//interface MyBuilder<T extends MyBuilder> {
-//    T build();
-//}
-//
-//class MyBean {
-//
-//   MyBuilder myBuilder() {
-//       return null;
-//   }
-//
-//}
-//
-//''')
-//        expect:
-//            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
-//            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
-//            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-//            typeArguments.size() == 1
-//            def typeArgument = typeArguments.get("T")
-//            typeArgument.name == "test.MyBuilder"
-//            def nextTypeArguments = typeArgument.getTypeArguments()
-//            def nextTypeArgument = nextTypeArguments.get("T")
-//            nextTypeArgument.name == "java.lang.Object"
-//    }
-//
-//    void "test recursive generic method return 4"() {
-//        given:
-//            ClassElement ce = buildClassElement('''\
-//package test;
-//
-//class MyFactory {
-//
-//    MyBean myBean() {
-//        return new MyBean();
-//    }
-//}
-//
-//interface MyBuilder<T extends MyBuilder> {
-//    T build();
-//}
-//
-//class MyBean {
-//
-//   MyBuilder<?> myBuilder() {
-//       return null;
-//   }
-//
-//}
-//
-//''')
-//        expect:
-//            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
-//            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
-//            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-//            typeArguments.size() == 1
-//            def typeArgument = typeArguments.get("T")
-//            typeArgument.name == "test.MyBuilder"
-//            def nextTypeArguments = typeArgument.getTypeArguments()
-//            def nextTypeArgument = nextTypeArguments.get("T")
-//            nextTypeArgument.name == "test.MyBuilder"
-//            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-//            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-//            nextNextTypeArgument.name == "java.lang.Object"
-//    }
-//
-//    void "test recursive generic method return 5"() {
-//        given:
-//            ClassElement ce = buildClassElement('''\
-//package test;
-//
-//class MyFactory {
-//
-//    MyBean myBean() {
-//        return new MyBean();
-//    }
-//}
-//
-//interface MyBuilder<T extends MyBuilder> {
-//    T build();
-//}
-//
-//class MyBean {
-//
-//   MyBuilder<? extends MyBuilder> myBuilder() {
-//       return null;
-//   }
-//
-//}
-//
-//''')
-//        expect:
-//            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
-//            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
-//            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-//            typeArguments.size() == 1
-//            def typeArgument = typeArguments.get("T")
-//            typeArgument.name == "test.MyBuilder"
-//            def nextTypeArguments = typeArgument.getTypeArguments()
-//            def nextTypeArgument = nextTypeArguments.get("T")
-//            nextTypeArgument.name == "test.MyBuilder"
-//            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-//            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-//            nextNextTypeArgument.name == "java.lang.Object"
-//    }
-//
-//    void "test recursive generic method return 6"() {
-//        given:
-//            ClassElement ce = buildClassElement('''\
-//package test;
-//
-//class MyFactory {
-//
-//    MyBean myBean() {
-//        return new MyBean();
-//    }
-//}
-//
-//interface MyBuilder<T extends MyBuilder> {
-//    T build();
-//}
-//
-//class MyBean<T extends MyBuilder> {
-//
-//   MyBuilder<T> myBuilder() {
-//       return null;
-//   }
-//
-//}
-//
-//''')
-//        expect:
-//            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
-//            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
-//            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-//            typeArguments.size() == 1
-//            def typeArgument = typeArguments.get("T")
-//            typeArgument.name == "test.MyBuilder"
-//            def nextTypeArguments = typeArgument.getTypeArguments()
-//            def nextTypeArgument = nextTypeArguments.get("T")
-//            nextTypeArgument.name == "test.MyBuilder"
-//            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-//            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-//            nextNextTypeArgument.name == "java.lang.Object"
-//    }
-//
-//    void "test recursive generic method return 7"() {
-//        given:
-//            ClassElement ce = buildClassElement('''\
-//package test;
-//
-//class MyFactory {
-//
-//    MyBean myBean() {
-//        return new MyBean();
-//    }
-//}
-//
-//interface MyBuilder<T extends MyBuilder> {
-//    T build();
-//}
-//
-//class MyBean<T extends MyBuilder> {
-//
-//   MyBuilder<? extends T> myBuilder() {
-//       return null;
-//   }
-//
-//}
-//
-//''')
-//        expect:
-//            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
-//            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
-//            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-//            typeArguments.size() == 1
-//            def typeArgument = typeArguments.get("T")
-//            typeArgument.name == "test.MyBuilder"
-//            def nextTypeArguments = typeArgument.getTypeArguments()
-//            def nextTypeArgument = nextTypeArguments.get("T")
-//            nextTypeArgument.name == "test.MyBuilder"
-//            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-//            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-//            nextNextTypeArgument.name == "java.lang.Object"
-//    }
-//
+
+    void "test annotations on recursive generic type parameter 1"() {
+        given:
+            ClassElement ce = buildClassElement('test.TrackedSortedSet', '''\
+package test
+
+import io.micronaut.kotlin.processing.inject.ast.TypeUseRuntimeAnn
+
+class TrackedSortedSet<@TypeUseRuntimeAnn T : java.lang.Comparable<out T>> {
+}
+
+''')
+        expect:
+            def typeArguments = ce.getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "java.lang.Comparable"
+            typeArgument.getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn']
+    }
+
+    void "test recursive generic type parameter 2"() {
+        when:
+            buildClassElement('test.Test', '''\
+package test
+
+class Test<T : Test<*>>
+
+''')
+        then:
+            def e = thrown(RuntimeException)
+            e.message.contains "This type parameter violates the Finite Bound Restriction"
+    }
+
+    void "test recursive generic type parameter 3"() {
+        given:
+            ClassElement ce = buildClassElement('test.Test', '''\
+package test
+
+class Test<T : Test<T>>
+
+''')
+        expect:
+            def typeArguments = ce.getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "test.Test"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "test.Test"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test recursive generic method return"() {
+        given:
+            ClassElement ce = buildClassElementTransformed('test.MyFactory', '''\
+package test
+
+import org.hibernate.SessionFactory
+import org.hibernate.engine.spi.SessionFactoryDelegatingImpl
+
+class MyFactory {
+
+    fun sessionFactory() : SessionFactory {
+         return SessionFactoryDelegatingImpl(null)
+    }
+}
+
+''') {
+                def sessionFactoryMethod = it.findMethod("sessionFactory").get()
+                def withOptionsMethod = sessionFactoryMethod.getReturnType().findMethod("withOptions").get()
+                withOptionsMethod.getReturnType().getTypeArguments()
+                return it
+            }
+        expect:
+            def sessionFactoryMethod = ce.findMethod("sessionFactory").get()
+            def withOptionsMethod = sessionFactoryMethod.getReturnType().findMethod("withOptions").get()
+            def typeArguments = withOptionsMethod.getReturnType().getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "org.hibernate.SessionBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "org.hibernate.SessionBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
+//            def nextNextNextTypeArguments = nextNextTypeArgument.getTypeArguments()
+//            def nextNextNextTypeArgument = nextNextNextTypeArguments.get("T")
+//            nextNextNextTypeArgument.name ==
+    }
+
+    void "test recursive generic method return 2"() {
+        when:
+            buildClassElement('test.MyFactory', '''\
+package test;
+
+class MyFactory {
+
+    fun myBean(): MyBean {
+        return MyBean()
+    }
+}
+
+interface MyBuilder<T : MyBuilder<*>> {
+    fun build(): T
+}
+
+class MyBean {
+
+   fun myBuilder() : MyBuilder<test.MyBuilder>? {
+       return null
+   }
+
+}
+''')
+        then:
+            def e = thrown(RuntimeException)
+            e.message.contains "This type parameter violates the Finite Bound Restriction"
+    }
+
+    void "test recursive generic method return 3"() {
+        given:
+            ClassElement ce = buildClassElement('test.MyFactory', '''\
+package test
+
+class MyFactory {
+
+    fun myBean(): MyBean {
+        return MyBean()
+    }
+}
+
+interface MyBuilder<T : MyBuilder<T>> {
+    fun build(): T
+}
+
+class MyBean {
+
+   fun <K : MyBuilder<K>> myBuilder() : K? {
+       return null
+   }
+
+}
+''')
+        expect:
+            def myBeanMethod = ce.findMethod("myBean").get()
+            def myBuilderMethod = myBeanMethod.getReturnType().findMethod("myBuilder").get()
+            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "test.MyBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "test.MyBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test recursive generic method return 4"() {
+        given:
+            ClassElement ce = buildClassElement('test.MyFactory', '''\
+package test
+
+class MyFactory {
+
+    fun myBean(): MyBean {
+        return MyBean()
+    }
+}
+
+interface MyBuilder<T : MyBuilder<T>> {
+    fun build(): T
+}
+
+class MyBean {
+
+   fun myBuilder() : MyBuilder<*>? {
+       return null
+   }
+
+}
+''')
+        expect:
+            def myBeanMethod = ce.findMethod("myBean").get()
+            def myBuilderMethod = myBeanMethod.getReturnType().findMethod("myBuilder").get()
+            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "test.MyBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "test.MyBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test recursive generic method return 5"() {
+        given:
+            ClassElement ce = buildClassElement('test.MyFactory', '''\
+package test
+
+class MyFactory {
+
+    fun myBean(): MyBean<*> {
+        return MyBean()
+    }
+}
+
+interface MyBuilder<T : MyBuilder<T>> {
+    fun build(): T
+}
+
+class MyBean<K : MyBuilder<K>> {
+
+   fun myBuilder() : MyBuilder<K>? {
+       return null
+   }
+
+}
+''')
+        expect:
+            def myBeanMethod = ce.findMethod("myBean").get()
+            def myBuilderMethod = myBeanMethod.getReturnType().findMethod("myBuilder").get()
+            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "test.MyBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "test.MyBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
+    }
+
 //    void "test how the annotations from the type are propagated"() {
 //        given:
 //            ClassElement ce = buildClassElement('''\
@@ -1066,342 +964,355 @@ class Test {
 //        assert type.hasAnnotation(Introspected.class)
 //        assert type.getTypeAnnotationMetadata().isEmpty()
 //    }
-//
-//    void "test generics model"() {
-//        ClassElement ce = buildClassElement('''
-//package test;
-//import java.util.List;
-//
-//class Test {
-//    List<List<List<String>>> method1() {
-//        return null;
-//    }
-//}
-//''')
-//        expect:
-//            def method1 = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method1")).get()
-//            def genericType = method1.getGenericReturnType()
-//            def genericTypeLevel1 = genericType.getTypeArguments()["E"]
-//            !genericTypeLevel1.isGenericPlaceholder()
-//            !genericTypeLevel1.isWildcard()
-//            def genericTypeLevel2 = genericTypeLevel1.getTypeArguments()["E"]
-//            !genericTypeLevel2.isGenericPlaceholder()
-//            !genericTypeLevel2.isWildcard()
-//            def genericTypeLevel3 = genericTypeLevel2.getTypeArguments()["E"]
-//            !genericTypeLevel3.isGenericPlaceholder()
-//            !genericTypeLevel3.isWildcard()
-//
-//            def type = method1.getReturnType()
-//            def typeLevel1 = type.getTypeArguments()["E"]
-//            !typeLevel1.isGenericPlaceholder()
-//            !typeLevel1.isWildcard()
-//            def typeLevel2 = typeLevel1.getTypeArguments()["E"]
-//            !typeLevel2.isGenericPlaceholder()
-//            !typeLevel2.isWildcard()
-//            def typeLevel3 = typeLevel2.getTypeArguments()["E"]
-//            !typeLevel3.isGenericPlaceholder()
-//            !typeLevel3.isWildcard()
-//    }
-//
-//    void "test generics model for wildcard"() {
-//        ClassElement ce = buildClassElement('''
-//package test;
-//import java.util.List;
-//
-//class Test<T> {
-//
-//    List<?> method() {
-//        return null;
-//    }
-//}
-//''')
-//        expect:
-//            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
-//            def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
-//            !genericTypeArgument.isGenericPlaceholder()
-//            !genericTypeArgument.isRawType()
-//            genericTypeArgument.isWildcard()
-//
-//            def typeArgument = method.getReturnType().getTypeArguments()["E"]
-//            !typeArgument.isGenericPlaceholder()
-//            !typeArgument.isRawType()
-//            typeArgument.isWildcard()
-//    }
-//
-//    void "test generics model for placeholder"() {
-//        ClassElement ce = buildClassElement('''
-//package test;
-//import java.util.List;
-//
-//class Test<T> {
-//
-//    List<T> method() {
-//        return null;
-//    }
-//}
-//''')
-//        expect:
-//            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
-//            def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
-//            genericTypeArgument.isGenericPlaceholder()
-//            !genericTypeArgument.isRawType()
-//            !genericTypeArgument.isWildcard()
-//
-//            def typeArgument = method.getReturnType().getTypeArguments()["E"]
-//            typeArgument.isGenericPlaceholder()
-//            !typeArgument.isRawType()
-//            !typeArgument.isWildcard()
-//    }
-//
-//    void "test generics model for class placeholder wildcard"() {
-//        ClassElement ce = buildClassElement('''
-//package test;
-//import java.util.List;
-//
-//class Test<T> {
-//
-//    List<? extends T> method() {
-//        return null;
-//    }
-//}
-//''')
-//        expect:
-//            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
-//            def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
-//            !genericTypeArgument.isGenericPlaceholder()
-//            !genericTypeArgument.isRawType()
-//            genericTypeArgument.isWildcard()
-//
-//            def genericWildcard = genericTypeArgument as WildcardElement
-//            !genericWildcard.lowerBounds
-//            genericWildcard.upperBounds.size() == 1
-//            def genericUpperBound = genericWildcard.upperBounds[0]
-//            genericUpperBound.name == "java.lang.Object"
-//            genericUpperBound.isGenericPlaceholder()
-//            !genericUpperBound.isWildcard()
-//            !genericUpperBound.isRawType()
-//            def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
-//            genericPlaceholderUpperBound.variableName == "T"
-//            genericPlaceholderUpperBound.declaringElement.get() == ce
-//
-//            def typeArgument = method.getReturnType().getTypeArguments()["E"]
-//            !typeArgument.isGenericPlaceholder()
-//            !typeArgument.isRawType()
-//            typeArgument.isWildcard()
-//
-//            def wildcard = genericTypeArgument as WildcardElement
-//            !wildcard.lowerBounds
-//            wildcard.upperBounds.size() == 1
-//            def upperBound = wildcard.upperBounds[0]
-//            upperBound.name == "java.lang.Object"
-//            upperBound.isGenericPlaceholder()
-//            !upperBound.isWildcard()
-//            !upperBound.isRawType()
-//            def placeholderUpperBound = upperBound as GenericPlaceholderElement
-//            placeholderUpperBound.variableName == "T"
-//            placeholderUpperBound.declaringElement.get() == ce
-//    }
-//
-//    void "test generics model for method placeholder wildcard"() {
-//        ClassElement ce = buildClassElement('''
-//package test;
-//import java.util.List;
-//
-//class Test {
-//
-//    <T> List<? extends T> method() {
-//        return null;
-//    }
-//}
-//''')
-//        expect:
-//            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
-//            method.getDeclaredTypeVariables().size() == 1
-//            method.getDeclaredTypeVariables()[0].declaringElement.get() == method
-//            method.getDeclaredTypeVariables()[0].variableName == "T"
-//            method.getDeclaredTypeArguments().size() == 1
-//            def placeholder = method.getDeclaredTypeArguments()["T"] as GenericPlaceholderElement
-//            placeholder.declaringElement.get() == method
-//            placeholder.variableName == "T"
-//            def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
-//            !genericTypeArgument.isGenericPlaceholder()
-//            !genericTypeArgument.isRawType()
-//            genericTypeArgument.isWildcard()
-//
-//            def genericWildcard = genericTypeArgument as WildcardElement
-//            !genericWildcard.lowerBounds
-//            genericWildcard.upperBounds.size() == 1
-//            def genericUpperBound = genericWildcard.upperBounds[0]
-//            genericUpperBound.name == "java.lang.Object"
-//            genericUpperBound.isGenericPlaceholder()
-//            !genericUpperBound.isWildcard()
-//            !genericUpperBound.isRawType()
-//            def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
-//            genericPlaceholderUpperBound.variableName == "T"
-//            genericPlaceholderUpperBound.declaringElement.get() == method
-//
-//            def typeArgument = method.getReturnType().getTypeArguments()["E"]
-//            !typeArgument.isGenericPlaceholder()
-//            !typeArgument.isRawType()
-//            typeArgument.isWildcard()
-//
-//            def wildcard = genericTypeArgument as WildcardElement
-//            !wildcard.lowerBounds
-//            wildcard.upperBounds.size() == 1
-//            def upperBound = wildcard.upperBounds[0]
-//            upperBound.name == "java.lang.Object"
-//            upperBound.isGenericPlaceholder()
-//            !upperBound.isWildcard()
-//            !upperBound.isRawType()
-//            def placeholderUpperBound = upperBound as GenericPlaceholderElement
-//            placeholderUpperBound.variableName == "T"
-//            placeholderUpperBound.declaringElement.get() == method
-//    }
-//
-//    void "test generics model for constructor placeholder wildcard"() {
-//        ClassElement ce = buildClassElement('''
-//package test;
-//import java.util.List;
-//
-//class Test {
-//
-//    <T> Test(List<? extends T> list) {
-//    }
-//}
-//''')
-//        expect:
-//            def method = ce.getPrimaryConstructor().get()
-//            method.getDeclaredTypeVariables().size() == 1
-//            method.getDeclaredTypeVariables()[0].declaringElement.get() == method
-//            method.getDeclaredTypeVariables()[0].variableName == "T"
-//            method.getDeclaredTypeArguments().size() == 1
-//            def placeholder = method.getDeclaredTypeArguments()["T"] as GenericPlaceholderElement
-//            placeholder.declaringElement.get() == method
-//            placeholder.variableName == "T"
-//            def genericTypeArgument = method.getParameters()[0].getGenericType().getTypeArguments()["E"]
-//            !genericTypeArgument.isGenericPlaceholder()
-//            !genericTypeArgument.isRawType()
-//            genericTypeArgument.isWildcard()
-//
-//            def genericWildcard = genericTypeArgument as WildcardElement
-//            !genericWildcard.lowerBounds
-//            genericWildcard.upperBounds.size() == 1
-//            def genericUpperBound = genericWildcard.upperBounds[0]
-//            genericUpperBound.name == "java.lang.Object"
-//            genericUpperBound.isGenericPlaceholder()
-//            !genericUpperBound.isWildcard()
-//            !genericUpperBound.isRawType()
-//            def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
-//            genericPlaceholderUpperBound.variableName == "T"
-//            genericPlaceholderUpperBound.declaringElement.get() == method
-//
-//            def typeArgument = method.getParameters()[0].getType().getTypeArguments()["E"]
-//            !typeArgument.isGenericPlaceholder()
-//            !typeArgument.isRawType()
-//            typeArgument.isWildcard()
-//
-//            def wildcard = genericTypeArgument as WildcardElement
-//            !wildcard.lowerBounds
-//            wildcard.upperBounds.size() == 1
-//            def upperBound = wildcard.upperBounds[0]
-//            upperBound.name == "java.lang.Object"
-//            upperBound.isGenericPlaceholder()
-//            !upperBound.isWildcard()
-//            !upperBound.isRawType()
-//            def placeholderUpperBound = upperBound as GenericPlaceholderElement
-//            placeholderUpperBound.variableName == "T"
-//            placeholderUpperBound.declaringElement.get() == method
-//    }
-//
-//    void "test generics equality"() {
-//        ClassElement ce = buildClassElement('''
-//package test;
-//import java.util.List;
-//
-//class Test<T extends Number> {
-//
-//    Number number;
-//
-//    <N extends T> Test(List<? extends N> list) {
-//    }
-//
-//    <N extends T> List<? extends N> method1() {
-//        return null;
-//    }
-//
-//    List<? extends T> method2() {
-//        return null;
-//    }
-//
-//    T method3() {
-//        return null;
-//    }
-//
-//    List<List<? extends T>> method4() {
-//        return null;
-//    }
-//
-//    List<List<T>> method5() {
-//        return null;
-//    }
-//
-//    Test<T> method6() {
-//        return null;
-//    }
-//
-//    Test<?> method7() {
-//        return null;
-//    }
-//
-//    Test method8() {
-//        return null;
-//    }
-//
-//    <N extends T> Test<? extends N> method9() {
-//        return null;
-//    }
-//
-//    <N extends T> Test<? super N> method10() {
-//        return null;
-//    }
-//}
-//''')
-//        expect:
-//            def numberType = ce.getFields()[0].getType()
-//            def constructor = ce.getPrimaryConstructor().get()
-//            constructor.getParameters()[0].getGenericType().getTypeArguments(List).get("E") == numberType
-//            constructor.getParameters()[0].getType().getTypeArguments(List).get("E") == numberType
-//
-//            ce.findMethod("method1").get().getGenericReturnType().getTypeArguments(List).get("E") == numberType
-//            ce.findMethod("method1").get().getReturnType().getTypeArguments(List).get("E") == numberType
-//
-//            ce.findMethod("method2").get().getGenericReturnType().getTypeArguments(List).get("E") == numberType
-//            ce.findMethod("method2").get().getReturnType().getTypeArguments(List).get("E") == numberType
-//
-//            ce.findMethod("method3").get().getGenericReturnType() == numberType
-//            ce.findMethod("method3").get().getReturnType() == numberType
-//
-//            ce.findMethod("method4").get().getGenericReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
-//            ce.findMethod("method4").get().getReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
-//
-//            ce.findMethod("method5").get().getGenericReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
-//            ce.findMethod("method5").get().getReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
-//
-//            ce.findMethod("method6").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
-//            ce.findMethod("method6").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
-//
-//            ce.findMethod("method7").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
-//            ce.findMethod("method7").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
-//
-//            ce.findMethod("method8").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
-//            ce.findMethod("method8").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
-//
-//            ce.findMethod("method9").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
-//            ce.findMethod("method9").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
-//
-//            ce.findMethod("method10").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
-//            ce.findMethod("method10").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
-//    }
+
+    void "test generics model"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import java.util.List;
+
+class Test {
+    List<List<List<String>>> method1() {
+        return null;
+    }
+}
+''')
+        expect:
+            def method1 = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method1")).get()
+            def genericType = method1.getGenericReturnType()
+            def genericTypeLevel1 = genericType.getTypeArguments()["E"]
+            !genericTypeLevel1.isGenericPlaceholder()
+            !genericTypeLevel1.isWildcard()
+            def genericTypeLevel2 = genericTypeLevel1.getTypeArguments()["E"]
+            !genericTypeLevel2.isGenericPlaceholder()
+            !genericTypeLevel2.isWildcard()
+            def genericTypeLevel3 = genericTypeLevel2.getTypeArguments()["E"]
+            !genericTypeLevel3.isGenericPlaceholder()
+            !genericTypeLevel3.isWildcard()
+
+            def type = method1.getReturnType()
+            def typeLevel1 = type.getTypeArguments()["E"]
+            !typeLevel1.isGenericPlaceholder()
+            !typeLevel1.isWildcard()
+            def typeLevel2 = typeLevel1.getTypeArguments()["E"]
+            !typeLevel2.isGenericPlaceholder()
+            !typeLevel2.isWildcard()
+            def typeLevel3 = typeLevel2.getTypeArguments()["E"]
+            !typeLevel3.isGenericPlaceholder()
+            !typeLevel3.isWildcard()
+    }
+
+    void "test generics model for wildcard"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import java.util.List;
+
+class Test<T> {
+
+    List<?> method() {
+        return null;
+    }
+}
+''')
+        expect:
+            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
+            def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
+            !genericTypeArgument.isGenericPlaceholder()
+            !genericTypeArgument.isRawType()
+            genericTypeArgument.isWildcard()
+
+            def typeArgument = method.getReturnType().getTypeArguments()["E"]
+            !typeArgument.isGenericPlaceholder()
+            !typeArgument.isRawType()
+            typeArgument.isWildcard()
+    }
+
+    void "test generics model for placeholder"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import java.util.List;
+
+class Test<T> {
+
+    List<T> method() {
+        return null;
+    }
+}
+''')
+        expect:
+            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
+            def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
+            genericTypeArgument.isGenericPlaceholder()
+            !genericTypeArgument.isRawType()
+            !genericTypeArgument.isWildcard()
+
+            def typeArgument = method.getReturnType().getTypeArguments()["E"]
+            typeArgument.isGenericPlaceholder()
+            !typeArgument.isRawType()
+            !typeArgument.isWildcard()
+    }
+
+    void "test generics model for class placeholder wildcard"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import java.util.List;
+
+class Test<T> {
+
+    List<? extends T> method() {
+        return null;
+    }
+}
+''')
+        expect:
+            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
+            def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
+            !genericTypeArgument.isGenericPlaceholder()
+            !genericTypeArgument.isRawType()
+            genericTypeArgument.isWildcard()
+
+            def genericWildcard = genericTypeArgument as WildcardElement
+            !genericWildcard.lowerBounds
+            genericWildcard.upperBounds.size() == 1
+            def genericUpperBound = genericWildcard.upperBounds[0]
+            genericUpperBound.name == "java.lang.Object"
+            genericUpperBound.isGenericPlaceholder()
+            !genericUpperBound.isWildcard()
+            !genericUpperBound.isRawType()
+            def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
+            genericPlaceholderUpperBound.variableName == "T"
+            genericPlaceholderUpperBound.declaringElement.get() == ce
+
+            def typeArgument = method.getReturnType().getTypeArguments()["E"]
+            !typeArgument.isGenericPlaceholder()
+            !typeArgument.isRawType()
+            typeArgument.isWildcard()
+
+            def wildcard = genericTypeArgument as WildcardElement
+            !wildcard.lowerBounds
+            wildcard.upperBounds.size() == 1
+            def upperBound = wildcard.upperBounds[0]
+            upperBound.name == "java.lang.Object"
+            upperBound.isGenericPlaceholder()
+            !upperBound.isWildcard()
+            !upperBound.isRawType()
+            def placeholderUpperBound = upperBound as GenericPlaceholderElement
+            placeholderUpperBound.variableName == "T"
+            placeholderUpperBound.declaringElement.get() == ce
+    }
+
+    void "test generics model for method placeholder wildcard"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import java.util.List;
+
+class Test {
+
+    <T> List<? extends T> method() {
+        return null;
+    }
+}
+''')
+        expect:
+            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
+            method.getDeclaredTypeVariables().size() == 1
+            method.getDeclaredTypeVariables()[0].declaringElement.get() == method
+            method.getDeclaredTypeVariables()[0].variableName == "T"
+            method.getDeclaredTypeArguments().size() == 1
+            def placeholder = method.getDeclaredTypeArguments()["T"] as GenericPlaceholderElement
+            placeholder.declaringElement.get() == method
+            placeholder.variableName == "T"
+            def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
+            !genericTypeArgument.isGenericPlaceholder()
+            !genericTypeArgument.isRawType()
+            genericTypeArgument.isWildcard()
+
+            def genericWildcard = genericTypeArgument as WildcardElement
+            !genericWildcard.lowerBounds
+            genericWildcard.upperBounds.size() == 1
+            def genericUpperBound = genericWildcard.upperBounds[0]
+            genericUpperBound.name == "java.lang.Object"
+            genericUpperBound.isGenericPlaceholder()
+            !genericUpperBound.isWildcard()
+            !genericUpperBound.isRawType()
+            def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
+            genericPlaceholderUpperBound.variableName == "T"
+            genericPlaceholderUpperBound.declaringElement.get() == method
+
+            def typeArgument = method.getReturnType().getTypeArguments()["E"]
+            !typeArgument.isGenericPlaceholder()
+            !typeArgument.isRawType()
+            typeArgument.isWildcard()
+
+            def wildcard = genericTypeArgument as WildcardElement
+            !wildcard.lowerBounds
+            wildcard.upperBounds.size() == 1
+            def upperBound = wildcard.upperBounds[0]
+            upperBound.name == "java.lang.Object"
+            upperBound.isGenericPlaceholder()
+            !upperBound.isWildcard()
+            !upperBound.isRawType()
+            def placeholderUpperBound = upperBound as GenericPlaceholderElement
+            placeholderUpperBound.variableName == "T"
+            placeholderUpperBound.declaringElement.get() == method
+    }
+
+    void "test generics model for constructor placeholder wildcard"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import java.util.List;
+
+class Test {
+
+    <T> Test(List<? extends T> list) {
+    }
+}
+''')
+        expect:
+            def method = ce.getPrimaryConstructor().get()
+            method.getDeclaredTypeVariables().size() == 1
+            method.getDeclaredTypeVariables()[0].declaringElement.get() == method
+            method.getDeclaredTypeVariables()[0].variableName == "T"
+            method.getDeclaredTypeArguments().size() == 1
+            def placeholder = method.getDeclaredTypeArguments()["T"] as GenericPlaceholderElement
+            placeholder.declaringElement.get() == method
+            placeholder.variableName == "T"
+            def genericTypeArgument = method.getParameters()[0].getGenericType().getTypeArguments()["E"]
+            !genericTypeArgument.isGenericPlaceholder()
+            !genericTypeArgument.isRawType()
+            genericTypeArgument.isWildcard()
+
+            def genericWildcard = genericTypeArgument as WildcardElement
+            !genericWildcard.lowerBounds
+            genericWildcard.upperBounds.size() == 1
+            def genericUpperBound = genericWildcard.upperBounds[0]
+            genericUpperBound.name == "java.lang.Object"
+            genericUpperBound.isGenericPlaceholder()
+            !genericUpperBound.isWildcard()
+            !genericUpperBound.isRawType()
+            def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
+            genericPlaceholderUpperBound.variableName == "T"
+            genericPlaceholderUpperBound.declaringElement.get() == method
+
+            def typeArgument = method.getParameters()[0].getType().getTypeArguments()["E"]
+            !typeArgument.isGenericPlaceholder()
+            !typeArgument.isRawType()
+            typeArgument.isWildcard()
+
+            def wildcard = genericTypeArgument as WildcardElement
+            !wildcard.lowerBounds
+            wildcard.upperBounds.size() == 1
+            def upperBound = wildcard.upperBounds[0]
+            upperBound.name == "java.lang.Object"
+            upperBound.isGenericPlaceholder()
+            !upperBound.isWildcard()
+            !upperBound.isRawType()
+            def placeholderUpperBound = upperBound as GenericPlaceholderElement
+            placeholderUpperBound.variableName == "T"
+            placeholderUpperBound.declaringElement.get() == method
+    }
+
+    void "test generics equality"() {
+        ClassElement ce = buildClassElementTransformed('test.Test', '''
+package test
+
+import java.util.List
+
+class Test<T : Number?>(list: List<T>) {
+
+    var number: Number? = null
+
+    var obj: Any? = null
+
+    fun <N : T?> method1(): List<N?>? {
+        return null
+    }
+
+    fun method2(): List<T>? {
+        return null
+    }
+
+    fun method3(): T? {
+        return null
+    }
+
+    fun method4(): List<List<T>>? {
+        return null
+    }
+
+    fun method5(): List<List<T>>? {
+        return null
+    }
+
+    fun method6(): Test<T>? {
+        return null
+    }
+
+    fun method7(): Test<*>? {
+        return null
+    }
+
+    fun method8(): Test<*>? {
+        return null
+    }
+
+    fun <N : T?> method9(): Test<out N?>? {
+        return null
+    }
+
+    fun <N : T?> method10(): Test<in N?>? {
+        return null
+    }
+}
+''') {
+
+            it.getPrimaryConstructor().get().getParameters().each {
+                it.getGenericType().getAllTypeArguments().values().forEach { m -> m.values().forEach {it.getAllTypeArguments()}}
+                it.getType().getAllTypeArguments().values().forEach { m -> m.values().forEach {it.getAllTypeArguments()}}
+            }
+            it.getMethods().forEach {
+                it.getReturnType().getAllTypeArguments().values().forEach { m -> m.values().forEach {it.getAllTypeArguments()}}
+                it.getGenericReturnType().getAllTypeArguments().values().forEach { m -> m.values().forEach {it.getAllTypeArguments()}}
+            }
+            it
+        }
+        expect:
+            def numberType = ce.getFields()[0].getType()
+            def objectType = ce.getFields()[1].getType()
+
+            def constructor = ce.getPrimaryConstructor().get()
+            constructor.getParameters()[0].getGenericType().getTypeArguments(List).get("E") == numberType
+            constructor.getParameters()[0].getType().getTypeArguments(List).get("E") == numberType
+
+            ce.findMethod("method1").get().getGenericReturnType().getTypeArguments(List).get("E") == numberType
+            ce.findMethod("method1").get().getReturnType().getTypeArguments(List).get("E") == numberType
+
+            ce.findMethod("method2").get().getGenericReturnType().getTypeArguments(List).get("E") == numberType
+            ce.findMethod("method2").get().getReturnType().getTypeArguments(List).get("E") == numberType
+
+            ce.findMethod("method3").get().getGenericReturnType() == numberType
+            ce.findMethod("method3").get().getReturnType() == numberType
+
+            ce.findMethod("method4").get().getGenericReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
+            ce.findMethod("method4").get().getReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
+
+            ce.findMethod("method5").get().getGenericReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
+            ce.findMethod("method5").get().getReturnType().getTypeArguments(List).get("E").getTypeArguments(List).get("E") == numberType
+
+            ce.findMethod("method6").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
+            ce.findMethod("method6").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
+
+            ce.findMethod("method7").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
+            ce.findMethod("method7").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
+
+            ce.findMethod("method8").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
+            ce.findMethod("method8").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
+
+            ce.findMethod("method9").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
+            ce.findMethod("method9").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
+
+            ce.findMethod("method10").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
+            ce.findMethod("method10").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
+    }
 
     void "test inherit parameter annotation"() {
         ClassElement ce = buildClassElement('test.UserController', '''

@@ -25,6 +25,7 @@ import java.util.function.Function
 
 class KotlinWildcardElement(
     private val typeArgument: KSTypeArgument,
+    private var upper: KotlinClassElement,
     private val upperBounds: List<KotlinClassElement?>,
     private val lowerBounds: List<KotlinClassElement?>,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
@@ -32,12 +33,12 @@ class KotlinWildcardElement(
     private val isRawType: Boolean,
     arrayDimensions: Int = 0
 ) : KotlinClassElement(
-    upperBounds[0]!!.nativeType,
+    upper.nativeType,
     elementAnnotationMetadataFactory,
     visitorContext,
-    emptyMap(),
+    upper.resolvedTypeArguments,
     arrayDimensions,
-    false
+    true
 ), WildcardElement {
 
     override fun isRawType() = isRawType
@@ -59,7 +60,7 @@ class KotlinWildcardElement(
             }.toList()
         return fold.apply(
             if (upperBounds.contains(null) || lowerBounds.contains(null)) null else KotlinWildcardElement(
-                typeArgument, upperBounds, lowerBounds, elementAnnotationMetadataFactory, visitorContext, isRawType, arrayDimensions
+                typeArgument, upper, upperBounds, lowerBounds, elementAnnotationMetadataFactory, visitorContext, isRawType, arrayDimensions
             )
         )
     }
