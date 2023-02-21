@@ -28,8 +28,7 @@ class KotlinConstructorElement(method: KSFunctionDeclaration,
                                declaringType: ClassElement,
                                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                                visitorContext: KotlinVisitorContext,
-                               returnType: ClassElement
-): ConstructorElement, KotlinMethodElement(method, declaringType, returnType, elementAnnotationMetadataFactory, visitorContext) {
+): ConstructorElement, KotlinMethodElement(method, declaringType, elementAnnotationMetadataFactory, visitorContext) {
 
     init {
         if (method.closestClassDeclaration()?.modifiers?.contains(Modifier.DATA) == true &&

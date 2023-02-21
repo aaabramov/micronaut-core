@@ -243,7 +243,23 @@ abstract class AbstractKotlinElement<T : KSNode>(
         visitedTypes: MutableSet<Any>
     ): ClassElement {
         val variableName = typeParameter.name.asString()
-        val bounded = parentTypeArguments[variableName] as KotlinClassElement?
+        var bounded = parentTypeArguments[variableName] as KotlinClassElement?
+        if (bounded is WildcardElement && !bounded.isBounded) {
+            bounded = null
+        }
+        val parent = typeParameter.parent
+        val thisNode = if (declaration is KSAnnotatedReference) {
+            declaration.node
+        } else {
+            declaration
+        }
+        val declaringElement = if (thisNode == parent) {
+            this
+        } else if (parent is KSClassDeclaration) {
+            newKotlinClassElement(parent, emptyMap())
+        } else {
+            null
+        }
         val stripTypeArguments = !visitedTypes.add(typeParameter)
         val bounds = typeParameter.bounds.map {
             val argumentType = it.resolve()
@@ -256,6 +272,7 @@ abstract class AbstractKotlinElement<T : KSNode>(
             typeParameter,
             bounded,
             bounds,
+            declaringElement,
             0,
             annotationMetadataFactory,
             visitorContext

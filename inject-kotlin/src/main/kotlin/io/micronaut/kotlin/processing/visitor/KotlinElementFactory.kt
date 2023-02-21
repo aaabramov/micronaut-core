@@ -143,18 +143,14 @@ class KotlinElementFactory(
         method: KSFunctionDeclaration,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): KotlinMethodElement {
-        val returnType = method.returnType!!.resolve()
-
-        val returnTypeElement = newClassElement(returnType, elementAnnotationMetadataFactory)
 
         val kotlinMethodElement = KotlinMethodElement(
             method,
             declaringClass,
-            returnTypeElement,
             elementAnnotationMetadataFactory,
             visitorContext
         )
-        if (returnType.isMarkedNullable && !kotlinMethodElement.returnType.isPrimitive) {
+        if (method.returnType!!.resolve().isMarkedNullable && !kotlinMethodElement.returnType.isPrimitive) {
             kotlinMethodElement.annotate(AnnotationUtil.NULLABLE)
         }
         return kotlinMethodElement
@@ -192,7 +188,7 @@ class KotlinElementFactory(
         constructor: KSFunctionDeclaration,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): ConstructorElement {
-        return KotlinConstructorElement(constructor, owningClass, elementAnnotationMetadataFactory, visitorContext, owningClass)
+        return KotlinConstructorElement(constructor, owningClass, elementAnnotationMetadataFactory, visitorContext)
     }
 
     override fun newFieldElement(

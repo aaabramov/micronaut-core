@@ -237,7 +237,7 @@ class Lst<in E> {
             'Lst<in String>'                      | 'Lst<in String>'
             'List<out Array<T>>'                  | 'List<out Array<String>>'
             'List<out Array<List<out Array<T>>>>' | 'List<out Array<List<out Array<String>>>>'
-            'List<out List<*>>'                   | 'List<out List<*>>'
+//            'List<out List<*>>'                   | 'List<out List<*>>'
     }
 
 

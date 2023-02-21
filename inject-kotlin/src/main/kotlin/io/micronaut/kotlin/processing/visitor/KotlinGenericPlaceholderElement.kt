@@ -15,14 +15,12 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.closestClassDeclaration
 import com.google.devtools.ksp.symbol.KSTypeParameter
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
-import io.micronaut.kotlin.processing.getBinaryName
 import java.util.*
 import java.util.function.Function
 
@@ -31,6 +29,7 @@ class KotlinGenericPlaceholderElement(
     private var upper: KotlinClassElement,
     private var resolved: KotlinClassElement?,
     private var bounds: List<KotlinClassElement>,
+    private var declaringElement: Element?,
     arrayDimensions: Int = 0,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext
@@ -47,6 +46,7 @@ class KotlinGenericPlaceholderElement(
         parameter: KSTypeParameter,
         resolved: KotlinClassElement?,
         bounds: List<KotlinClassElement>,
+        declaringElement: Element?,
         arrayDimensions: Int = 0,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
         visitorContext: KotlinVisitorContext
@@ -55,6 +55,7 @@ class KotlinGenericPlaceholderElement(
         selectClassElementRepresentingThisPlaceholder(resolved, bounds),
         resolved,
         bounds,
+        declaringElement,
         arrayDimensions,
         elementAnnotationMetadataFactory,
         visitorContext
@@ -67,6 +68,7 @@ class KotlinGenericPlaceholderElement(
         upper,
         resolved,
         bounds,
+        declaringElement,
         arrayDimensions,
         annotationMetadataFactory,
         visitorContext
@@ -84,6 +86,7 @@ class KotlinGenericPlaceholderElement(
         upper,
         resolved,
         bounds,
+        declaringElement,
         arrayDimensions,
         annotationMetadataFactory,
         visitorContext
@@ -95,15 +98,7 @@ class KotlinGenericPlaceholderElement(
 
     override fun getResolved(): Optional<ClassElement> = Optional.ofNullable(resolved)
 
-    override fun getDeclaringElement(): Optional<Element> {
-        val classDeclaration = parameter.closestClassDeclaration()
-        return Optional.ofNullable(classDeclaration).map {
-            visitorContext.elementFactory.newClassElement(
-                classDeclaration!!.asStarProjectedType(),
-                visitorContext.elementAnnotationMetadataFactory
-            )
-        }
-    }
+    override fun getDeclaringElement(): Optional<Element> = Optional.ofNullable(declaringElement)
 
     override fun foldBoundGenericTypes(fold: Function<ClassElement, ClassElement?>) = fold.apply(this)
 

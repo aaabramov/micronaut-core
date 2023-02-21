@@ -65,16 +65,21 @@ open class KotlinMethodElement : AbstractKotlinElement<KSAnnotated>, MethodEleme
     private val parameters: List<ParameterElement> by lazy {
         parameterInit.get()
     }
-    private val returnType: ClassElement
-    private val internalGenericReturnType: ClassElement by lazy {
-        when (val rt = getReturnType()) {
-            is KotlinClassElement -> {
-                newClassElement(rt.kotlinType, declaringType.typeArguments)
-            }
+    private var presetReturnType: ClassElement? = null
+    private var method: KSFunctionDeclaration? = null
 
-            else -> {
-                rt
-            }
+    private val internalReturnType: ClassElement by lazy {
+        if (presetReturnType != null) {
+            presetReturnType!!;
+        } else {
+            newClassElement(method!!.returnType!!.resolve(), emptyMap())
+        }
+    }
+    private val internalGenericReturnType: ClassElement by lazy {
+        if (presetReturnType != null) {
+            presetReturnType!!;
+        } else {
+            newClassElement(method!!.returnType!!.resolve(), declaringType.typeArguments)
         }
     }
     private val abstract: Boolean
@@ -95,7 +100,7 @@ open class KotlinMethodElement : AbstractKotlinElement<KSAnnotated>, MethodEleme
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.propertyElement = propertyElement
         this.owningType = owningType
-        this.returnType = PrimitiveElement.VOID
+        this.presetReturnType = PrimitiveElement.VOID
         this.abstract = method.receiver.isAbstract()
         val visibility = method.getVisibility()
         this.public = visibility == Visibility.PUBLIC
@@ -122,7 +127,7 @@ open class KotlinMethodElement : AbstractKotlinElement<KSAnnotated>, MethodEleme
         this.propertyElement = propertyElement
         this.owningType = owningType
         this.parameterInit = Supplier { emptyList() }
-        this.returnType = returnType
+        this.presetReturnType = returnType
         this.abstract = method.receiver.isAbstract()
         this.public = method.receiver.isPublic()
         this.private = method.receiver.isPrivate()
@@ -133,10 +138,10 @@ open class KotlinMethodElement : AbstractKotlinElement<KSAnnotated>, MethodEleme
     constructor(
         method: KSFunctionDeclaration,
         owningType: ClassElement,
-        returnType: ClassElement,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
         visitorContext: KotlinVisitorContext
     ) : super(KSFunctionReference(method), elementAnnotationMetadataFactory, visitorContext) {
+        this.method = method
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.owningType = owningType
         this.parameterInit = Supplier {
@@ -155,7 +160,6 @@ open class KotlinMethodElement : AbstractKotlinElement<KSAnnotated>, MethodEleme
             }
         }
         this.propertyElement = null
-        this.returnType = returnType
         this.abstract = method.isAbstract
         this.public = method.isPublic()
         this.private = method.isPrivate()
@@ -183,7 +187,7 @@ open class KotlinMethodElement : AbstractKotlinElement<KSAnnotated>, MethodEleme
             parameters
         }
         this.propertyElement = null
-        this.returnType = returnType
+        this.presetReturnType = returnType
         this.abstract = abstract
         this.public = public
         this.private = private
@@ -196,9 +200,11 @@ open class KotlinMethodElement : AbstractKotlinElement<KSAnnotated>, MethodEleme
             is KSPropertyGetter, is KSPropertySetter -> {
                 true
             }
+
             is KSFunctionDeclaration -> {
                 declaration.functionKind != FunctionKind.MEMBER && declaration.functionKind != FunctionKind.STATIC
             }
+
             else -> {
                 false
             }
@@ -293,7 +299,7 @@ open class KotlinMethodElement : AbstractKotlinElement<KSAnnotated>, MethodEleme
 
     override fun getDeclaringType() = internalDeclaringType
 
-    override fun getReturnType() = returnType
+    override fun getReturnType() = internalReturnType
 
     override fun getGenericReturnType() = internalGenericReturnType
 
@@ -330,7 +336,6 @@ open class KotlinMethodElement : AbstractKotlinElement<KSAnnotated>, MethodEleme
             return KotlinMethodElement(
                 declaration.unwrap() as KSFunctionDeclaration,
                 owningType,
-                returnType,
                 annotationMetadataFactory,
                 visitorContext
             )

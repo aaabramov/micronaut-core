@@ -83,7 +83,7 @@ open class KotlinClassElement(
         typeVariable
     )
 
-    val outerType: KSType? by lazy {
+    private val outerType: KSType? by lazy {
         val outerDecl = classDeclaration.parentDeclaration as? KSClassDeclaration
         outerDecl?.asType(kotlinType.arguments.subList(classDeclaration.typeParameters.size, kotlinType.arguments.size))
     }
@@ -105,31 +105,28 @@ open class KotlinClassElement(
     private val enclosedElementsQuery = KotlinEnclosedElementsQuery()
     private val nativeProperties: List<PropertyElement> by lazy {
         val properties: MutableList<PropertyElement> = ArrayList()
-        var clazz: KSClassDeclaration? = classDeclaration
+        var clazz: KotlinClassElement? = this
         while (clazz != null) {
-            clazz.getDeclaredProperties()
-                .filter { !it.isPrivate() }
-                .map {
-                    KotlinPropertyElement(
-                        this,
-                        visitorContext.elementFactory.newClassElement(
-                            it.type.resolve(),
-                            elementAnnotationMetadataFactory
-                        ),
-                        it,
-                        elementAnnotationMetadataFactory, visitorContext
-                    )
-                }
-                .filter { !it.hasAnnotation(JvmField::class.java) }
-                .forEach { properties.add(it) }
-            val ksTypeReference = clazz.superTypes.firstOrNull()
-            clazz = if (ksTypeReference is KSClassDeclaration) {
-                ksTypeReference
-            } else {
-                null
-            }
+            // We need to aggregate all the hierarchy properties because
+            // getAllProperties doesn't return correct parent of the property
+            properties.addAll(clazz.getDeclaredSyntheticBeanProperties())
+            clazz = clazz.superType.orElse(null) as KotlinClassElement?
         }
         properties
+    }
+    private val declaredNativeProperties: List<PropertyElement> by lazy {
+        classDeclaration.getDeclaredProperties()
+            .filter { !it.isPrivate() }
+            .map {
+                KotlinPropertyElement(
+                    this,
+                    it,
+                    elementAnnotationMetadataFactory,
+                    visitorContext
+                )
+            }
+            .filter { !it.hasAnnotation(JvmField::class.java) }
+            .toList()
     }
     private val internalCanonicalName: String by lazy {
         classDeclaration.qualifiedName!!.asString()
@@ -239,6 +236,8 @@ open class KotlinClassElement(
     override fun isNullable() = kotlinType.isMarkedNullable
 
     override fun getSyntheticBeanProperties() = nativeProperties
+
+    private fun getDeclaredSyntheticBeanProperties() = declaredNativeProperties
 
     override fun getAccessibleStaticCreators(): List<MethodElement> {
         val staticCreators: MutableList<MethodElement> = mutableListOf()
@@ -638,7 +637,15 @@ open class KotlinClassElement(
 
     override fun getTypeArguments(): Map<String, ClassElement> {
         if (resolvedTypeArguments == null) {
-            resolvedTypeArguments = resolveTypeArguments(kotlinType, emptyMap())
+            val ksDeclaration = kotlinType.declaration
+            resolvedTypeArguments = if (ksDeclaration is KSTypeParameter) {
+                resolveTypeArguments(
+                    ksDeclaration.bounds.toList()[0].resolve(),
+                    emptyMap()
+                )
+            } else {
+                resolveTypeArguments(kotlinType, emptyMap())
+            }
 //            val typeArguments = mutableMapOf<String, ClassElement>()
 //            val elementFactory = visitorContext.elementFactory
 //            val typeParameters = kotlinType.declaration.typeParameters
@@ -853,10 +860,6 @@ open class KotlinClassElement(
                     if (elementType == PropertyElement::class.java) {
                         val prop = KotlinPropertyElement(
                             this@KotlinClassElement,
-                            visitorContext.elementFactory.newClassElement(
-                                ee.type.resolve(),
-                                elementAnnotationMetadataFactory
-                            ),
                             ee,
                             elementAnnotationMetadataFactory, visitorContext
                         )

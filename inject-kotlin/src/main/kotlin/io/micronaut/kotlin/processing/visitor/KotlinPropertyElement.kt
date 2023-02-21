@@ -35,15 +35,21 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
 
     private val name: String
     private val classElement: ClassElement
-    private val type: ClassElement
-    private val internalGenericType: ClassElement by lazy {
-        when (val t = getType()) {
-            is KotlinClassElement -> {
-                newClassElement(t.kotlinType, declaringType.typeArguments)
-            }
-            else -> {
-                t
-            }
+    private var presetType: ClassElement? = null
+    private var propertyDeclaration: KSPropertyDeclaration? = null
+
+    private val resolvedType: ClassElement by lazy {
+        if (presetType != null) {
+            presetType!!
+        } else {
+            newClassElement(propertyDeclaration!!.type.resolve(), emptyMap())
+        }
+    }
+    private val resolvedGenericType: ClassElement by lazy {
+        if (presetType != null) {
+            presetType!!
+        } else {
+            newClassElement(propertyDeclaration!!.type.resolve(), declaringType.typeArguments)
         }
     }
     private val setter: Optional<MethodElement>
@@ -52,7 +58,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     private val abstract: Boolean
     private val excluded: Boolean
     private var annotationMetadata: MutableAnnotationMetadataDelegate<*>? = null
-    private val internalDeclaringType: ClassElement by lazy {
+    private val resolvedDeclaringType: ClassElement by lazy {
         var parent = declaration.parent
         if (parent is KSPropertyDeclaration) {
             parent = parent.parent
@@ -71,14 +77,13 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     }
 
     constructor(classElement: ClassElement,
-                type: ClassElement,
                 property: KSPropertyDeclaration,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext,
                 excluded : Boolean = false) : super(KSPropertyReference(property), elementAnnotationMetadataFactory, visitorContext) {
+        this.propertyDeclaration = property
         this.name = property.simpleName.asString()
         this.excluded = excluded
-        this.type = type
         this.classElement = classElement
         this.setter = Optional.ofNullable(property.setter)
             .map { method ->
@@ -201,7 +206,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 visitorContext: KotlinVisitorContext,
                 excluded : Boolean = false) : super(getter, elementAnnotationMetadataFactory, visitorContext) {
         this.name = name
-        this.type = type
+        this.presetType = type
         this.excluded = excluded
         this.classElement = classElement
         this.setter = Optional.ofNullable(setter)
@@ -304,7 +309,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 visitorContext: KotlinVisitorContext,
                 excluded : Boolean = false) : super(pickDeclaration(type, field, getter, setter), elementAnnotationMetadataFactory, visitorContext) {
         this.name = name
-        this.type = type
+        this.presetType = type
         this.classElement = classElement
         this.setter = Optional.ofNullable(setter)
         this.getter = Optional.ofNullable(getter)
@@ -430,7 +435,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
 
     override fun isExcluded() = excluded
 
-    override fun getGenericType() = internalGenericType
+    override fun getGenericType() = resolvedGenericType
 
     override fun getAnnotationMetadata() = annotationMetadata!!
 
@@ -440,9 +445,9 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
 
     override fun getModifiers() = super<AbstractKotlinElement>.getModifiers()
 
-    override fun getType() = type
+    override fun getType() = resolvedType
 
-    override fun getDeclaringType() = internalDeclaringType
+    override fun getDeclaringType() = resolvedDeclaringType
 
     override fun getOwningType() = classElement
 
@@ -455,7 +460,6 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
             val property : KSPropertyDeclaration = nativeType as KSPropertyDeclaration
             return KotlinPropertyElement(
                 classElement,
-                type,
                 property,
                 annotationMetadataFactory,
                 visitorContext,
@@ -465,7 +469,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
             val getter : KSFunctionDeclaration = nativeType as KSFunctionDeclaration
             return KotlinPropertyElement(
                 classElement,
-                type,
+                presetType!!,
                 name,
                 getter,
                 setter.map { it.nativeType as KSFunctionDeclaration }.orElse(null),
@@ -487,8 +491,14 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
 
     override fun getArrayDimensions() = type.arrayDimensions
 
-    override fun isDeclaredNullable() = type is KotlinClassElement && type.kotlinType.isMarkedNullable
+    override fun isDeclaredNullable(): Boolean {
+        val theType = resolvedType
+        return theType is KotlinClassElement && theType.kotlinType.isMarkedNullable
+    }
 
-    override fun isNullable() = type is KotlinClassElement && type.kotlinType.isMarkedNullable
+    override fun isNullable(): Boolean {
+        val theType = resolvedType
+        return theType is KotlinClassElement && theType.kotlinType.isMarkedNullable
+    }
 
 }
